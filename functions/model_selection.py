@@ -4,6 +4,7 @@ import nibabel as nib
 import os.path as osp
 import seaborn as sns
 import pandas as pd
+import os
 import sys
 import scipy
 
@@ -59,6 +60,18 @@ def roi_earlyvisualcortex(list_of_labels):
     return final_mask_L, final_mask_R, index_L_mask, index_R_mask
 
 def calculate_overlap(map_1, map_2, retinotopic_map, mask, angle = 'rad'):
+    """ Calculate the overlap (Jaccard index) between two retinotopic maps.
+
+    Args:
+        map_1 (numpy array): Predicted (or empirical) retinotopic map from subject 1
+        map_2 (numpy array): Predicted (or empirical) retinotopic map from subject 2 (or 1)
+        retinotopic_map (str): Type of retinotopic map ('polarAngle', 'eccentricity' or 'pRFsize')
+        mask (numpy array): Mask of the region of interest
+        angle (str): Units of the angle (rad or original)
+    
+    Returns:
+        score (float): Overlap between the two retinotopic maps
+    """
     if angle == 'rad':
         map_1 = map_1 * (180/np.pi)
         map_2 = map_2 * (180/np.pi)
@@ -73,6 +86,7 @@ def calculate_overlap(map_1, map_2, retinotopic_map, mask, angle = 'rad'):
         map_2[(map_2 > 45) & (map_2 <= 180)] = 90 
         map_2[(map_2 >= 315) & (map_2 <= 360)] = 360 
         map_2[(map_2 > 180) & (map_2 < 315)] = 270
+
     elif retinotopic_map == 'eccentricity':
         map_1[(map_1 >= 0) & (map_1 <= 2)] = 0
         map_1[(map_1 > 2) & (map_1 <= 4)] = 2
@@ -84,8 +98,26 @@ def calculate_overlap(map_1, map_2, retinotopic_map, mask, angle = 'rad'):
         map_2[(map_2 > 4) & (map_2 <= 6)] = 4
         map_2[(map_2 > 6)] = 6
 
-    # elif retinotopic_map == 'pRFsize':
-        # TODO
+    elif retinotopic_map == 'pRFsize':
+        map_1[(map_1 >= 0) & (map_1 <= .5)] = 0
+        map_1[(map_1 > .5) & (map_1 <= 1)] = 1
+        map_1[(map_1 > 1) & (map_1 <= 1.5)] = 2
+        map_1[(map_1 > 1.5) & (map_1 <= 2)] = 3
+        map_1[(map_1 > 2) & (map_1 <= 2.5)] = 4
+        map_1[(map_1 > 2.5) & (map_1 <= 3)] = 5
+        map_1[(map_1 > 3) & (map_1 <= 3.5)] = 6
+        map_1[(map_1 > 3.5) & (map_1 <= 4)] = 7
+        map_1[(map_1 > 4)] = 8
+
+        map_2[(map_2 >= 0) & (map_2 <= .5)] = 0
+        map_2[(map_2 > .5) & (map_2 <= 1)] = 1
+        map_2[(map_2 > 1) & (map_2 <= 1.5)] = 2
+        map_2[(map_2 > 1.5) & (map_2 <= 2)] = 3
+        map_2[(map_2 > 2) & (map_2 <= 2.5)] = 4
+        map_2[(map_2 > 2.5) & (map_2 <= 3)] = 5
+        map_2[(map_2 > 3) & (map_2 <= 3.5)] = 6
+        map_2[(map_2 > 3.5) & (map_2 <= 4)] = 7
+        map_2[(map_2 > 4)] = 8
 
     jaccard_1 = jaccard_score(map_1[mask],
                             map_2[mask],
@@ -97,6 +129,16 @@ def calculate_overlap(map_1, map_2, retinotopic_map, mask, angle = 'rad'):
     return score
 
 def transform_polarangle(data):
+    """Transform polar angle values from the left hemisphere to the range from 0-90 degrees 
+    (UVF) and from 360-270 degrees (LVF).
+
+    Args:
+        data (numpy array): Polar angle values
+
+    Returns:
+        data (numpy array): Transformed polar angle values
+    """
+
     subtract = data > 180
     add = data < 180
     data[subtract] = data[subtract] - 180
@@ -104,7 +146,22 @@ def transform_polarangle(data):
     return data
 
 def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mapping = 'continuous'):
+    """Calculate the inter-individual variability in predicted maps and the error
+    between predicted and empirical maps for different models.
     
+    Args:
+        path (str): Path to the Freesurfer directory (both empirical and predicted maps should be 
+            located at the deepRetinotopy folder within the individual's directory)
+        retinotopic_map (str): Type of retinotopic map ('polarAngle', 'eccentricity' or 'pRFsize')
+        hemisphere (str): Hemisphere ('lh' or 'rh')
+        retinotopic_mapping (str): Type of retinotopic mapping ('continuous' or 'discrete')
+
+    Returns:
+        df (pandas dataframe): Dataframe containing the inter-individual variability in predicted maps 
+            and the error.
+        plt (matplotlib.pyplot): Plot of the inter-individual variability in predicted maps and the error. 
+            PNG file saved at the output folder.
+    """
     mean_ind_variability = []
     error = []
 
@@ -122,22 +179,22 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
 
         # Region of interest used for training
         ROI = ['ROI']
-        final_mask_L, final_mask_R, index_L_mask, index_R_mask = roi(
+        final_mask_L_ROI, final_mask_R_ROI, index_L_mask, index_R_mask = roi(
             ROI)
         ROI_masked = np.zeros((32492, 1))
-        # early visual cortex
+        # Early visual cortex
         final_mask_L, final_mask_R, index_L_mask, index_R_mask = roi_earlyvisualcortex(['ROI'])
-        dorsal_earlyVisualCortex = np.zeros((32492, 1))
+        earlyVisualCortex = np.zeros((32492, 1))
 
         if hemisphere == 'lh':
-            ROI_masked[final_mask_L == 1] = 1
-            dorsal_earlyVisualCortex[final_mask_L == 1] = 1
+            ROI_masked[final_mask_L_ROI == 1] = 1
+            earlyVisualCortex[final_mask_L == 1] = 1
         else: 
-            ROI_masked[final_mask_R == 1] = 1
-            dorsal_earlyVisualCortex[final_mask_R == 1] = 1
+            ROI_masked[final_mask_R_ROI == 1] = 1
+            earlyVisualCortex[final_mask_R == 1] = 1
 
-        # Final mask (selecting dorsal V1-V3 vertices)
-        mask = ROI_masked + dorsal_earlyVisualCortex
+        # Final mask (selecting V1-V3 vertices)
+        mask = ROI_masked + earlyVisualCortex
         mask = mask[ROI_masked == 1]
         mask = mask > 1
 
@@ -146,33 +203,48 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
             for i in range(len(dev_set)):
                 # Error
                 if i == j:
-                    # Loading predicted values
+                    # Loading maps
                     predicted_map = np.array(nib.load(osp.join(path,
                                      dev_set[i] + '/deepRetinotopy/' + dev_set[i] + '.fs_predicted_' + 
                                      retinotopic_map + '_' + hemisphere + '_curvatureFeat_model' + str(model + 1) + '.func.gii')).agg_data()).reshape(
                                      number_hemi_nodes, -1)[ROI_masked == 1]
                     empirical_map = np.array(nib.load(osp.join(path,
                                      dev_set[i] + '/deepRetinotopy/' + dev_set[i] + '.fs_empirical_' + 
-                                     retinotopic_map + '_' + hemisphere + '_masked.func.gii')).agg_data()).reshape(
+                                     retinotopic_map + '_' + hemisphere + '.func.gii')).agg_data()).reshape(
                                      number_hemi_nodes, -1)[ROI_masked == 1]
+                    # Transform polar angle values from lh
                     if retinotopic_map == 'polarAngle' and hemisphere == 'lh':
                         predicted_map = transform_polarangle(predicted_map)
-                        predicted_map = np.array(predicted_map) * (np.pi / 180)
-
                         empirical_map = transform_polarangle(empirical_map)
+                    assert np.min(predicted_map[mask]) > 0
+                    assert np.min(empirical_map[mask]) > 0
+                    
+                    # Transforming to radians
+                    if retinotopic_map == 'polarAngle' or retinotopic_map == 'eccentricity':
+                        predicted_map = np.array(predicted_map) * (np.pi / 180)
                         empirical_map = np.array(empirical_map) * (np.pi / 180)
+                    elif retinotopic_map == 'pRFsize':
+                        predicted_map = np.array(predicted_map)
+                        empirical_map = np.array(empirical_map)
 
+                    # Calculating error
                     if retinotopic_mapping == 'continuous':
-                        theta = smallest_angle(predicted_map[mask],
+                        if retinotopic_map == 'polarAngle' or retinotopic_map == 'eccentricity':
+                            theta = smallest_angle(predicted_map[mask],
                                             empirical_map[mask])
+                        elif retinotopic_map == 'pRFsize':
+                            theta = np.abs(predicted_map[mask] - empirical_map[mask])
                         theta_withinsubj.append(np.mean(theta))
                     elif retinotopic_mapping == 'discrete':
-                        if retinotopic_map == 'polarAngle':
+                        if retinotopic_map == 'polarAngle' or retinotopic_map == 'eccentricity':
                             overlap = calculate_overlap(predicted_map, empirical_map, retinotopic_map, mask, angle = 'rad')
-                            theta_withinsubj.append(overlap)
+                        else:
+                            overlap = calculate_overlap(predicted_map, empirical_map, retinotopic_map, mask, angle = 'original')
+                        theta_withinsubj.append(overlap)
+
                 # Inter-individual variability in predicted maps
                 if i != j:
-                    # Loading predicted values
+                    # Loading maps
                     predicted_map_1 = np.array(nib.load(osp.join(path,
                                         dev_set[i] + '/deepRetinotopy/' + dev_set[i] + '.fs_predicted_' + 
                                         retinotopic_map + '_' + hemisphere + '_curvatureFeat_model' + str(model + 1) + '.func.gii')).agg_data()).reshape(
@@ -181,29 +253,39 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
                                         dev_set[j] + '/deepRetinotopy/' + dev_set[j] + '.fs_predicted_' + 
                                         retinotopic_map + '_' + hemisphere + '_curvatureFeat_model' + str(model + 1) + '.func.gii')).agg_data()).reshape(
                                         number_hemi_nodes, -1)[ROI_masked == 1]
-
+                    # Transform polar angle values from lh
                     if retinotopic_map == 'polarAngle' and hemisphere == 'lh':
                         predicted_map_1 = transform_polarangle(predicted_map_1)
-                        predicted_map_1 = np.array(predicted_map_1) * (np.pi / 180)
-
                         predicted_map_2 = transform_polarangle(predicted_map_2)
+                    assert np.min(predicted_map_1[mask]) > 0
+                    assert np.min(predicted_map_2[mask]) > 0
+                    
+                    # Transforming to radians
+                    if retinotopic_map == 'polarAngle' or retinotopic_map == 'eccentricity':
+                        predicted_map_1 = np.array(predicted_map_1) * (np.pi / 180)
                         predicted_map_2 = np.array(predicted_map_2) * (np.pi / 180)
-
+                    elif retinotopic_map == 'pRFsize':
+                        predicted_map_1 = np.array(predicted_map_1)
+                        predicted_map_2 = np.array(predicted_map_2)
+                    
+                    # Calculating inter-individual variability
                     if retinotopic_mapping == 'continuous':
-                        theta_pred = smallest_angle(predicted_map_1[mask],
+                        if retinotopic_map == 'polarAngle' or retinotopic_map == 'eccentricity':
+                            theta_pred = smallest_angle(predicted_map_1[mask],
                                                     predicted_map_2[mask])
+                        elif retinotopic_map == 'pRFsize':
+                            theta_pred = np.abs(predicted_map_1[mask] - predicted_map_2[mask])
                         theta_pred_across_temp.append(
                             np.mean(theta_pred))
                     elif retinotopic_mapping == 'discrete':
-                        if retinotopic_map == 'polarAngle':
+                        if retinotopic_map == 'polarAngle' or retinotopic_map == 'eccentricity':
                             overlap = calculate_overlap(predicted_map_1, predicted_map_2, retinotopic_map, mask, angle = 'rad')
-                            theta_pred_across_temp.append(overlap)
+                        else:
+                            overlap = calculate_overlap(predicted_map_1, predicted_map_2, retinotopic_map, mask, angle = 'original')
+                        theta_pred_across_temp.append(overlap)
             theta_acrosssubj_pred.append(theta_pred_across_temp)
 
         mean_theta_withinsubj = np.array(theta_withinsubj)
-        # if retinotopic_mapping == 'continuous':
-        #     mean_theta_acrosssubj_pred = np.mean(np.array(theta_acrosssubj_pred), axis=1)
-        # else: 
         mean_theta_acrosssubj_pred = np.mean(np.array(theta_acrosssubj_pred), axis=1)
 
         error.append(mean_theta_withinsubj)
@@ -212,33 +294,51 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
     error = np.reshape(np.array(error), (5, -1))
     mean_ind_variability = np.reshape(np.array(mean_ind_variability), (5, -1))
 
-    data_ind_variability = [[mean_ind_variability[i], len(mean_ind_variability[i]) * ['Model ' + str(i+1)],
+    data_ind_variability = [[mean_ind_variability[i], 
+                             len(mean_ind_variability[i]) * ['Model ' + str(i+1)],
                             len(mean_ind_variability[i]) * ['Individual variability']] for i in range(5)]
-    data_error = [[error[i], len(mean_ind_variability[i]) * ['Model ' + str(i+1)],
-                            len(mean_ind_variability[i]) * [
-                                'Error']] for i in range(5)]
+    data_error = [[error[i], 
+                    len(mean_ind_variability[i]) * ['Model ' + str(i+1)],
+                    len(mean_ind_variability[i]) * ['Error']] for i in range(5)]
     data = np.concatenate(data_ind_variability + data_error, axis = 1)
 
     df = pd.DataFrame(columns=['$\Delta$$\t\Theta$', 'Model', 'Metric'],
                       data=data.T)
     df['$\Delta$$\t\Theta$'] = df['$\Delta$$\t\Theta$'].astype(float)
 
-    palette = ['dimgray', 'lightgray']
+    # Generate plot
+    if os.path.isdir('../output') == False:
+        os.mkdir('../output')
+        
     sns.set_style("whitegrid")
     fig = plt.figure()
-    ax = sns.pointplot(y='$\Delta$$\t\Theta$', x='Model',
-                       hue='Metric', data=df, palette=palette,
-                       join=False, dodge=True, ci=95)
-    ax.set_title('Early visual areas')
-    if str(retinotopic_map) == 'eccentricity' or str(retinotopic_map) == 'pRFsize':
-        plt.ylim([0, 1])
+    ax = sns.catplot(y='$\Delta$$\t\Theta$', x='Model',
+                       col='Metric', data=df, palette="flare", kind="swarm", hue='Model')
+ 
+    ax.set_titles("{col_name}")
+    if retinotopic_mapping == 'discrete':
+        ax.set_axis_labels("Model", "Mean Jaccard index")
+    else:
+        ax.set_axis_labels("Model", "Mean $\Delta$$\t\Theta$")
+    if str(retinotopic_map) == 'eccentricity':
+        if retinotopic_mapping == 'continuous':
+            plt.ylim([0, 2])
+        else:
+            plt.ylim([0, 1])
+    elif str(retinotopic_map) == 'pRFsize':
+        if retinotopic_mapping == 'continuous':
+            plt.ylim([0, 1])
+        else:
+            plt.ylim([0, 1])
     else:
         if retinotopic_mapping == 'continuous':
             plt.ylim([0, 40])
         else:
             plt.ylim([0, 1])
-    # plt.savefig('ModelSelection_DorsalV123.svg')
+
+    fig.suptitle('Early visual areas')
     plt.show()
+    plt.savefig('../output/ModelSelection_EarlyVisualAreas_' + retinotopic_map + '_' + retinotopic_mapping + '_' + hemisphere + '.pdf')
     return df
 
 

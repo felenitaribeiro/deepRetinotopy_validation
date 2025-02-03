@@ -58,8 +58,52 @@ def roi(list_of_labels):
 
     return final_mask_L, final_mask_R, index_L_mask, index_R_mask
 
+def roi_earlyvisualcortex(list_of_labels):
+    """Mask for the selection of the region of interest in the surface
+    template.
 
-def polarAngle_plot(subject_id, path, template_path, prediction = 'average', binarize=False, save=False, save_path=None):
+    Args:
+        list_of_labels (list): list with the file name (.mat) containing the
+            region of interest (from both L and R hemispheres)
+
+    Returns:
+        final_mask_L (numpy array): Mask of the region of interest from left
+            hemisphere (32492,)
+
+        final_mask_R (numpy array): Mask of the region of interest from
+            right hemisphere (32492,)
+
+        index_L_mask (list): Indices of the non-zero elements from
+            final_mask_L (number of nonzero elements,)
+
+        index_R_mask (list): Indices of the non-zero elements from
+            final_mask_R (number of nonzero elements,)
+
+    """
+
+    # Defining number of nodes
+    number_cortical_nodes = int(64984)
+    number_hemi_nodes = int(number_cortical_nodes / 2)
+
+    list_primary_visual_areas = np.zeros([len(list_of_labels), 64984])
+    for i in range(len(list_of_labels)):
+        list_primary_visual_areas[i] = np.reshape(scipy.io.loadmat(
+            osp.join('../functions/',
+                     'rois/EarlyVisualCortex',
+                     list_of_labels[i] + '_V1-3.mat'))[list_of_labels[i]][0:64984],
+                                                  (-1))
+
+    final_mask_L = np.sum(list_primary_visual_areas, axis=0)[
+                   0:number_hemi_nodes]
+    final_mask_R = np.sum(list_primary_visual_areas, axis=0)[
+                   number_hemi_nodes:number_cortical_nodes]
+
+    index_L_mask = [i for i, j in enumerate(final_mask_L) if j == 1]
+    index_R_mask = [i for i, j in enumerate(final_mask_R) if j == 1]
+
+    return final_mask_L, final_mask_R, index_L_mask, index_R_mask
+
+def retinotopic_map_plot(subject_id, path, template_path, prediction = 'average', binarize=False, save=False, save_path=None, retinotopic_map = 'polarAngle'):
     """
     Plot the polar angle map of the early visual cortex.
     Parameters
@@ -104,54 +148,61 @@ def polarAngle_plot(subject_id, path, template_path, prediction = 'average', bin
         label_primary_visual_areas)
 
    
-
-    # Loading the polarAngle predictions
-    polarAngle = np.zeros((32492, 1))
+    data = np.zeros((32492, 1))
     if prediction != 'empirical':
         data = np.array(nib.load(osp.join(path,
-                                     subject_id + '/deepRetinotopy/' + subject_id + '.fs_predicted_polarAngle_lh_curvatureFeat_' + prediction + '.func.gii')).agg_data()).reshape(
-                                     number_hemi_nodes, -1)
-        polarAngle[final_mask_L == 1] = np.reshape(
-        data[final_mask_L == 1], (-1, 1))
+                                        subject_id + '/deepRetinotopy/' + subject_id + '.fs_predicted_' + retinotopic_map + '_lh_curvatureFeat_' + prediction + '.func.gii')).agg_data()).reshape(
+                                        number_hemi_nodes, -1)
+        data[final_mask_L == 1] = np.reshape(data[final_mask_L == 1], (-1, 1))
 
-    
     else:
         data = np.array(nib.load(osp.join(path,
-                                     subject_id + '/deepRetinotopy/' + subject_id + '.fs_empirical_polarAngle_lh_masked.func.gii')).agg_data()).reshape(
-                                     number_hemi_nodes, -1)
-        polarAngle[final_mask_L == 1] = np.reshape(
+                                        subject_id + '/deepRetinotopy/' + subject_id + '.fs_empirical_' + retinotopic_map + '_lh_masked.func.gii')).agg_data()).reshape(
+                                        number_hemi_nodes, -1)
+        data[final_mask_L == 1] = np.reshape(
                 data[final_mask_L == 1], (-1, 1))
         
     # Reshift values
-    subtract = polarAngle >= 180
-    add = polarAngle < 180
-    polarAngle[subtract] = polarAngle[subtract] - 180
-    polarAngle[add] = polarAngle[add] + 180
-    # Masking
-    polarAngle = np.array(polarAngle) + threshold
+    if retinotopic_map=='polarAngle':
+        subtract = data >= 180
+        add = data < 180
+        data[subtract] = data[subtract] - 180
+        data[add] = data[add] + 180
+        # Masking
+        data = np.array(data) + threshold
+        data[final_mask_L != 1] = 0
 
-    polarAngle[final_mask_L != 1] = 0
+        # Binarizing values
+        if binarize == True:
+            data[(data >= 0) & (data <= 45)] = 0 + threshold
+            data[(data > 45) & (data <= 180)] = 90 + threshold
+            data[(data >= 315) & (data <= 360)] = 360 + threshold
+            data[(data > 180) & (data < 315)] = 270 + threshold
 
-    # Binarizing values
-    if binarize == True:
-        polarAngle[(polarAngle >= 0) & (polarAngle <= 45)] = 0 + threshold
-        polarAngle[(polarAngle > 45) & (polarAngle <= 180)] = 90 + threshold
-        polarAngle[(polarAngle >= 315) & (polarAngle <= 360)] = 360 + threshold
-        polarAngle[(polarAngle > 180) & (polarAngle < 315)] = 270 + threshold
+            data[final_mask_L != 1] = 0
 
-        polarAngle[final_mask_L != 1] = 0
+    elif retinotopic_map=='eccentricity' or retinotopic_map=='pRFsize':
+        data = np.array(data) + threshold
+        data[final_mask_L != 1] = 0
 
     # Plotting
+    if retinotopic_map == 'polarAngle':
+        max_value = 360
+    elif retinotopic_map == 'eccentricity':
+        max_value = 10
+    else:
+        max_value = 6
+
     view = plotting.view_surf(
         surf_mesh=osp.join(template_path,'fs_LR-deformed_to-fsaverage.L.sphere.32k_fs_LR.surf.gii'),
-        surf_map=np.reshape(polarAngle[0:32492], (-1)), bg_map=background,
+        surf_map=np.reshape(data[0:32492], (-1)), bg_map=background,
         cmap='gist_rainbow_r', black_bg=False, symmetric_cmap=False,
-        threshold=threshold, vmax=361)
+        threshold=threshold, vmax=max_value)
     # view.open_in_browser()
 
     if save == True:
         view.save_as_html(
-            osp.join(save_path, 'polarAngle_dorsal_' + subject_id + '.html'))
+            osp.join(save_path, retinotopic_map + '_earlyVisualAreas_' + subject_id + '_lh.html'))
     return view
 
 
