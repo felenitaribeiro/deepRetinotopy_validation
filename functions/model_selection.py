@@ -59,6 +59,47 @@ def roi_earlyvisualcortex(list_of_labels):
 
     return final_mask_L, final_mask_R, index_L_mask, index_R_mask
 
+def discretize(ind_map, retinotopic_map, hemisphere = 'lh'):
+    '''
+    Binarize the retinotopic map according to the type of map.
+    
+    Args:
+        ind_map (numpy array): Retinotopic map
+        retinotopic_map (str): Type of retinotopic map ('polarAngle', 'eccentricity' or 'pRFsize')
+        hemisphere (str): Hemisphere ('lh' or 'rh')
+
+    Returns:
+        ind_map (numpy array): Binarized retinotopic map
+    '''
+    if retinotopic_map == 'polarAngle':
+        if hemisphere == 'lh':
+            ind_map[(ind_map >= 0) & (ind_map <= 45)] = 0
+            ind_map[(ind_map > 45) & (ind_map <= 180)] = 90
+            ind_map[(ind_map >= 315) & (ind_map <= 360)] = 360
+            ind_map[(ind_map > 180) & (ind_map < 315)] = 270
+        else:
+            ind_map[(ind_map >= 0) & (ind_map <= 135)] = 90
+            ind_map[(ind_map > 135) & (ind_map <= 180)] = 130
+            ind_map[(ind_map > 180) & (ind_map <= 225)] = 220
+            ind_map[(ind_map > 225) & (ind_map <= 360)] = 270
+    elif retinotopic_map == 'eccentricity':
+        ind_map[(ind_map >= 0) & (ind_map <= 2)] = 0
+        ind_map[(ind_map > 2) & (ind_map <= 4)] = 2
+        ind_map[(ind_map > 4) & (ind_map <= 6)] = 4
+        ind_map[(ind_map > 6)] = 6
+    elif retinotopic_map == 'pRFsize':
+        ind_map[(ind_map > 4)] = 9
+        ind_map[(ind_map >= 3.5) & (ind_map <= 4)] = 8
+        ind_map[(ind_map >= 3) & (ind_map < 3.5)] = 7
+        ind_map[(ind_map >= 2.5) & (ind_map < 3)] = 6
+        ind_map[(ind_map >= 2) & (ind_map < 2.5)] = 5
+        ind_map[(ind_map >= 1.5) & (ind_map < 2)] = 4
+        ind_map[(ind_map >= 1) & (ind_map < 1.5)] = 3
+        ind_map[(ind_map >= .5) & (ind_map < 1)] = 2
+        ind_map[(ind_map >= .25) & (ind_map < .5)] = 1
+        ind_map[(ind_map >= 0) & (ind_map < .25)] = 0
+    return ind_map
+
 def calculate_overlap(map_1, map_2, retinotopic_map, mask, angle = 'rad', hemisphere = 'lh'):
     """ Calculate the overlap (Jaccard index) between two retinotopic maps.
 
@@ -76,59 +117,8 @@ def calculate_overlap(map_1, map_2, retinotopic_map, mask, angle = 'rad', hemisp
         map_1 = map_1 * (180/np.pi)
         map_2 = map_2 * (180/np.pi)
     
-    if retinotopic_map == 'polarAngle':
-        if hemisphere == 'lh':
-            map_1[(map_1 >= 0) & (map_1 <= 45)] = 0 
-            map_1[(map_1 > 45) & (map_1 <= 180)] = 90 
-            map_1[(map_1 >= 315) & (map_1 <= 360)] = 360 
-            map_1[(map_1 > 180) & (map_1 < 315)] = 270
-
-            map_2[(map_2 >= 0) & (map_2 <= 45)] = 0 
-            map_2[(map_2 > 45) & (map_2 <= 180)] = 90 
-            map_2[(map_2 >= 315) & (map_2 <= 360)] = 360 
-            map_2[(map_2 > 180) & (map_2 < 315)] = 270
-        else:
-            map_1[(map_1 >= 0) & (map_1 <= 135)] = 90 
-            map_1[(map_1 > 135) & (map_1 <= 180)] = 180 
-            map_1[(map_1 > 180) & (map_1 <= 225)] = 225 
-            map_1[(map_1 > 225) & (map_1 <= 360)] = 270
-
-            map_2[(map_2 >= 0) & (map_2 <= 135)] = 90
-            map_2[(map_2 > 135) & (map_2 <= 180)] = 180
-            map_2[(map_2 > 180) & (map_2 <= 225)] = 225
-            map_2[(map_2 > 225) & (map_2 <= 360)] = 270
-
-    elif retinotopic_map == 'eccentricity':
-        map_1[(map_1 >= 0) & (map_1 <= 2)] = 0
-        map_1[(map_1 > 2) & (map_1 <= 4)] = 2
-        map_1[(map_1 > 4) & (map_1 <= 6)] = 4
-        map_1[(map_1 > 6)] = 6
-
-        map_2[(map_2 >= 0) & (map_2 <= 2)] = 0
-        map_2[(map_2 > 2) & (map_2 <= 4)] = 2
-        map_2[(map_2 > 4) & (map_2 <= 6)] = 4
-        map_2[(map_2 > 6)] = 6
-
-    elif retinotopic_map == 'pRFsize':
-        map_1[(map_1 >= 0) & (map_1 <= .5)] = 0
-        map_1[(map_1 > .5) & (map_1 <= 1)] = 1
-        map_1[(map_1 > 1) & (map_1 <= 1.5)] = 2
-        map_1[(map_1 > 1.5) & (map_1 <= 2)] = 3
-        map_1[(map_1 > 2) & (map_1 <= 2.5)] = 4
-        map_1[(map_1 > 2.5) & (map_1 <= 3)] = 5
-        map_1[(map_1 > 3) & (map_1 <= 3.5)] = 6
-        map_1[(map_1 > 3.5) & (map_1 <= 4)] = 7
-        map_1[(map_1 > 4)] = 8
-
-        map_2[(map_2 >= 0) & (map_2 <= .5)] = 0
-        map_2[(map_2 > .5) & (map_2 <= 1)] = 1
-        map_2[(map_2 > 1) & (map_2 <= 1.5)] = 2
-        map_2[(map_2 > 1.5) & (map_2 <= 2)] = 3
-        map_2[(map_2 > 2) & (map_2 <= 2.5)] = 4
-        map_2[(map_2 > 2.5) & (map_2 <= 3)] = 5
-        map_2[(map_2 > 3) & (map_2 <= 3.5)] = 6
-        map_2[(map_2 > 3.5) & (map_2 <= 4)] = 7
-        map_2[(map_2 > 4)] = 8
+    map_1 = discretize(map_1, retinotopic_map, hemisphere)
+    map_2 = discretize(map_2, retinotopic_map, hemisphere)
 
     jaccard_1 = jaccard_score(map_1[mask],
                             map_2[mask],
@@ -203,7 +193,6 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
         else: 
             ROI_masked[final_mask_R_ROI == 1] = 1
             earlyVisualCortex[final_mask_R == 1] = 1
-            print('Right hemisphere')
 
         # Final mask (selecting V1-V3 vertices)
         mask = ROI_masked + earlyVisualCortex
@@ -216,12 +205,10 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
                 # Error
                 if i == j:
                     # Loading maps
-                    predicted_map = np.array(nib.load(osp.join(path,
-                                     dev_set[i] + '/deepRetinotopy/' + dev_set[i] + '.fs_predicted_' + 
+                    predicted_map = np.array(nib.load(osp.join(path, dev_set[i] + '.fs_predicted_' + 
                                      retinotopic_map + '_' + hemisphere + '_curvatureFeat_model' + str(model + 1) + '.func.gii')).agg_data()).reshape(
                                      number_hemi_nodes, -1)[ROI_masked == 1]
-                    empirical_map = np.array(nib.load(osp.join(path,
-                                     dev_set[i] + '/deepRetinotopy/' + dev_set[i] + '.fs_empirical_' + 
+                    empirical_map = np.array(nib.load(osp.join(path, dev_set[i] + '.fs_empirical_' + 
                                      retinotopic_map + '_' + hemisphere + '.func.gii')).agg_data()).reshape(
                                      number_hemi_nodes, -1)[ROI_masked == 1]
                     # Transform polar angle values from lh
@@ -229,8 +216,8 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
                         predicted_map = transform_polarangle(predicted_map)
                         empirical_map = transform_polarangle(empirical_map)
 
-                    assert np.min(predicted_map[mask]) > 0.
-                    assert np.min(empirical_map[mask]) > 0.
+                    assert np.min(predicted_map[mask]) >= 0.
+                    assert np.min(empirical_map[mask]) >= 0.
                     
                     # Transforming to radians
                     if retinotopic_map == 'polarAngle' or retinotopic_map == 'eccentricity':
@@ -259,11 +246,11 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
                 if i != j:
                     # Loading maps
                     predicted_map_1 = np.array(nib.load(osp.join(path,
-                                        dev_set[i] + '/deepRetinotopy/' + dev_set[i] + '.fs_predicted_' + 
+                                        dev_set[i] + '.fs_predicted_' + 
                                         retinotopic_map + '_' + hemisphere + '_curvatureFeat_model' + str(model + 1) + '.func.gii')).agg_data()).reshape(
                                         number_hemi_nodes, -1)[ROI_masked == 1]
                     predicted_map_2 = np.array(nib.load(osp.join(path,
-                                        dev_set[j] + '/deepRetinotopy/' + dev_set[j] + '.fs_predicted_' + 
+                                        dev_set[j] + '.fs_predicted_' + 
                                         retinotopic_map + '_' + hemisphere + '_curvatureFeat_model' + str(model + 1) + '.func.gii')).agg_data()).reshape(
                                         number_hemi_nodes, -1)[ROI_masked == 1]
                     # Transform polar angle values from lh
@@ -350,8 +337,8 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
             plt.ylim([0, 1])
 
     fig.suptitle('Early visual areas')
-    plt.show()
     plt.savefig('../output/ModelSelection_EarlyVisualAreas_' + retinotopic_map + '_' + retinotopic_mapping + '_' + hemisphere + '.pdf')
+    plt.show()
     return df
 
 
