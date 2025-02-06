@@ -103,7 +103,9 @@ def roi_earlyvisualcortex(list_of_labels):
 
     return final_mask_L, final_mask_R, index_L_mask, index_R_mask
 
-def retinotopic_map_plot(subject_id, path, template_path, prediction = 'average', binarize=False, save=False, save_path=None, retinotopic_map = 'polarAngle'):
+def retinotopic_map_plot(subject_id, path, template_path, prediction = 'average', 
+                         binarize=False, save=False, save_path=None, 
+                         retinotopic_map = 'polarAngle', hemisphere = 'lh'):
     """
     Plot the polar angle map of the early visual cortex.
     Parameters
@@ -131,8 +133,13 @@ def retinotopic_map_plot(subject_id, path, template_path, prediction = 'average'
     number_hemi_nodes = int(number_cortical_nodes / 2)
 
     # Loading the curvature map
-    background = np.array(nib.load(osp.join(path,
+    if hemisphere == 'lh':
+        background = np.array(nib.load(osp.join(path,
                                  subject_id + '/surf/' + subject_id + '.curvature-midthickness.lh.32k_fs_LR.func.gii')).agg_data()).reshape(
+                                 number_hemi_nodes, -1)
+    else:
+        background = np.array(nib.load(osp.join(path,
+                                 subject_id + '/surf/' + subject_id + '.curvature-midthickness.rh.32k_fs_LR.func.gii')).agg_data()).reshape(
                                  number_hemi_nodes, -1)
 
     # Background settings
@@ -149,42 +156,75 @@ def retinotopic_map_plot(subject_id, path, template_path, prediction = 'average'
 
    
     data = np.zeros((32492, 1))
-    if prediction != 'empirical':
-        data = np.array(nib.load(osp.join(path,
-                                        subject_id + '/deepRetinotopy/' + subject_id + '.fs_predicted_' + retinotopic_map + '_lh_curvatureFeat_' + prediction + '.func.gii')).agg_data()).reshape(
-                                        number_hemi_nodes, -1)
-        data[final_mask_L == 1] = np.reshape(data[final_mask_L == 1], (-1, 1))
+    if hemisphere == 'lh':
+        if prediction != 'empirical':
+            data = np.array(nib.load(osp.join(path,
+                                            subject_id + '/deepRetinotopy/' + subject_id + '.fs_predicted_' + retinotopic_map + '_lh_curvatureFeat_' + prediction + '.func.gii')).agg_data()).reshape(
+                                            number_hemi_nodes, -1)
+            data[final_mask_L == 1] = np.reshape(data[final_mask_L == 1], (-1, 1))
 
-    else:
-        data = np.array(nib.load(osp.join(path,
-                                        subject_id + '/deepRetinotopy/' + subject_id + '.fs_empirical_' + retinotopic_map + '_lh_masked.func.gii')).agg_data()).reshape(
-                                        number_hemi_nodes, -1)
-        data[final_mask_L == 1] = np.reshape(
-                data[final_mask_L == 1], (-1, 1))
-        
-    # Reshift values
-    if retinotopic_map=='polarAngle':
-        subtract = data >= 180
-        add = data < 180
-        data[subtract] = data[subtract] - 180
-        data[add] = data[add] + 180
-        # Masking
-        data = np.array(data) + threshold
-        data[final_mask_L != 1] = 0
-
-        # Binarizing values
-        if binarize == True:
-            data[(data >= 0) & (data <= 45)] = 0 + threshold
-            data[(data > 45) & (data <= 180)] = 90 + threshold
-            data[(data >= 315) & (data <= 360)] = 360 + threshold
-            data[(data > 180) & (data < 315)] = 270 + threshold
-
+        else:
+            data = np.array(nib.load(osp.join(path,
+                                            subject_id + '/deepRetinotopy/' + subject_id + '.fs_empirical_' + retinotopic_map + '_lh_masked.func.gii')).agg_data()).reshape(
+                                            number_hemi_nodes, -1)
+            data[final_mask_L == 1] = np.reshape(
+                    data[final_mask_L == 1], (-1, 1))
+            
+        # Reshift values
+        if retinotopic_map=='polarAngle':
+            subtract = data >= 180
+            add = data < 180
+            data[subtract] = data[subtract] - 180
+            data[add] = data[add] + 180
+            # Masking
+            data = np.array(data) + threshold
             data[final_mask_L != 1] = 0
 
-    elif retinotopic_map=='eccentricity' or retinotopic_map=='pRFsize':
-        data = np.array(data) + threshold
-        data[final_mask_L != 1] = 0
+            # Binarizing values
+            if binarize == True:
+                data[(data >= 0) & (data <= 45)] = 0 + threshold
+                data[(data > 45) & (data <= 180)] = 90 + threshold
+                data[(data >= 315) & (data <= 360)] = 360 + threshold
+                data[(data > 180) & (data < 315)] = 270 + threshold
 
+                data[final_mask_L != 1] = 0
+
+        elif retinotopic_map=='eccentricity' or retinotopic_map=='pRFsize':
+            data = np.array(data) + threshold
+            data[final_mask_L != 1] = 0
+    else:
+        if prediction != 'empirical':
+            data = np.array(nib.load(osp.join(path,
+                                            subject_id + '/deepRetinotopy/' + subject_id + '.fs_predicted_' + retinotopic_map + '_rh_curvatureFeat_' + prediction + '.func.gii')).agg_data()).reshape(
+                                            number_hemi_nodes, -1)
+            data[final_mask_R == 1] = np.reshape(data[final_mask_R == 1], (-1, 1))
+
+        else:
+            data = np.array(nib.load(osp.join(path,
+                                            subject_id + '/deepRetinotopy/' + subject_id + '.fs_empirical_' + retinotopic_map + '_rh_masked.func.gii')).agg_data()).reshape(
+                                            number_hemi_nodes, -1)
+            data[final_mask_R == 1] = np.reshape(
+                    data[final_mask_R == 1], (-1, 1))
+            
+        # Reshift values
+        if retinotopic_map=='polarAngle':
+            # Masking
+            data = np.array(data) + threshold
+            data[final_mask_R != 1] = 0
+
+            # Binarizing values
+            if binarize == True:
+                data[(data >= 0) & (data <= 135)] = 90 + threshold
+                data[(data > 135) & (data <= 180)] = 180 + threshold
+                data[(data > 180) & (data <= 225)] = 225 + threshold
+                data[(data > 225) & (data <= 360)] = 270 + threshold
+
+                data[final_mask_R != 1] = 0
+
+        elif retinotopic_map=='eccentricity' or retinotopic_map=='pRFsize':
+            data = np.array(data) + threshold
+            data[final_mask_R != 1] = 0
+    
     # Plotting
     if retinotopic_map == 'polarAngle':
         max_value = 360
@@ -193,10 +233,15 @@ def retinotopic_map_plot(subject_id, path, template_path, prediction = 'average'
     else:
         max_value = 6
 
+    colour = 'gist_rainbow_r'
+    if hemisphere == 'lh':
+        surface = osp.join(template_path,'fs_LR-deformed_to-fsaverage.L.sphere.32k_fs_LR.surf.gii')
+    else:
+        surface = osp.join(template_path,'fs_LR-deformed_to-fsaverage.R.sphere.32k_fs_LR.surf.gii')
     view = plotting.view_surf(
-        surf_mesh=osp.join(template_path,'fs_LR-deformed_to-fsaverage.L.sphere.32k_fs_LR.surf.gii'),
+        surf_mesh=surface,
         surf_map=np.reshape(data[0:32492], (-1)), bg_map=background,
-        cmap='gist_rainbow_r', black_bg=False, symmetric_cmap=False,
+        cmap=colour, black_bg=False, symmetric_cmap=False,
         threshold=threshold, vmax=max_value)
     # view.open_in_browser()
 

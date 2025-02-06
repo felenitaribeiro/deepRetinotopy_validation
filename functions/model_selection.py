@@ -59,7 +59,7 @@ def roi_earlyvisualcortex(list_of_labels):
 
     return final_mask_L, final_mask_R, index_L_mask, index_R_mask
 
-def calculate_overlap(map_1, map_2, retinotopic_map, mask, angle = 'rad'):
+def calculate_overlap(map_1, map_2, retinotopic_map, mask, angle = 'rad', hemisphere = 'lh'):
     """ Calculate the overlap (Jaccard index) between two retinotopic maps.
 
     Args:
@@ -77,15 +77,26 @@ def calculate_overlap(map_1, map_2, retinotopic_map, mask, angle = 'rad'):
         map_2 = map_2 * (180/np.pi)
     
     if retinotopic_map == 'polarAngle':
-        map_1[(map_1 >= 0) & (map_1 <= 45)] = 0 
-        map_1[(map_1 > 45) & (map_1 <= 180)] = 90 
-        map_1[(map_1 >= 315) & (map_1 <= 360)] = 360 
-        map_1[(map_1 > 180) & (map_1 < 315)] = 270
+        if hemisphere == 'lh':
+            map_1[(map_1 >= 0) & (map_1 <= 45)] = 0 
+            map_1[(map_1 > 45) & (map_1 <= 180)] = 90 
+            map_1[(map_1 >= 315) & (map_1 <= 360)] = 360 
+            map_1[(map_1 > 180) & (map_1 < 315)] = 270
 
-        map_2[(map_2 >= 0) & (map_2 <= 45)] = 0 
-        map_2[(map_2 > 45) & (map_2 <= 180)] = 90 
-        map_2[(map_2 >= 315) & (map_2 <= 360)] = 360 
-        map_2[(map_2 > 180) & (map_2 < 315)] = 270
+            map_2[(map_2 >= 0) & (map_2 <= 45)] = 0 
+            map_2[(map_2 > 45) & (map_2 <= 180)] = 90 
+            map_2[(map_2 >= 315) & (map_2 <= 360)] = 360 
+            map_2[(map_2 > 180) & (map_2 < 315)] = 270
+        else:
+            map_1[(map_1 >= 0) & (map_1 <= 135)] = 90 
+            map_1[(map_1 > 135) & (map_1 <= 180)] = 180 
+            map_1[(map_1 > 180) & (map_1 <= 225)] = 225 
+            map_1[(map_1 > 225) & (map_1 <= 360)] = 270
+
+            map_2[(map_2 >= 0) & (map_2 <= 135)] = 90
+            map_2[(map_2 > 135) & (map_2 <= 180)] = 180
+            map_2[(map_2 > 180) & (map_2 <= 225)] = 225
+            map_2[(map_2 > 225) & (map_2 <= 360)] = 270
 
     elif retinotopic_map == 'eccentricity':
         map_1[(map_1 >= 0) & (map_1 <= 2)] = 0
@@ -192,6 +203,7 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
         else: 
             ROI_masked[final_mask_R_ROI == 1] = 1
             earlyVisualCortex[final_mask_R == 1] = 1
+            print('Right hemisphere')
 
         # Final mask (selecting V1-V3 vertices)
         mask = ROI_masked + earlyVisualCortex
@@ -216,8 +228,9 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
                     if retinotopic_map == 'polarAngle' and hemisphere == 'lh':
                         predicted_map = transform_polarangle(predicted_map)
                         empirical_map = transform_polarangle(empirical_map)
-                    assert np.min(predicted_map[mask]) > 0
-                    assert np.min(empirical_map[mask]) > 0
+
+                    assert np.min(predicted_map[mask]) > 0.
+                    assert np.min(empirical_map[mask]) > 0.
                     
                     # Transforming to radians
                     if retinotopic_map == 'polarAngle' or retinotopic_map == 'eccentricity':
@@ -237,9 +250,9 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
                         theta_withinsubj.append(np.mean(theta))
                     elif retinotopic_mapping == 'discrete':
                         if retinotopic_map == 'polarAngle' or retinotopic_map == 'eccentricity':
-                            overlap = calculate_overlap(predicted_map, empirical_map, retinotopic_map, mask, angle = 'rad')
+                            overlap = calculate_overlap(predicted_map, empirical_map, retinotopic_map, mask, angle = 'rad', hemisphere = hemisphere)
                         else:
-                            overlap = calculate_overlap(predicted_map, empirical_map, retinotopic_map, mask, angle = 'original')
+                            overlap = calculate_overlap(predicted_map, empirical_map, retinotopic_map, mask, angle = 'original', hemisphere = hemisphere)
                         theta_withinsubj.append(overlap)
 
                 # Inter-individual variability in predicted maps
@@ -279,9 +292,9 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
                             np.mean(theta_pred))
                     elif retinotopic_mapping == 'discrete':
                         if retinotopic_map == 'polarAngle' or retinotopic_map == 'eccentricity':
-                            overlap = calculate_overlap(predicted_map_1, predicted_map_2, retinotopic_map, mask, angle = 'rad')
+                            overlap = calculate_overlap(predicted_map_1, predicted_map_2, retinotopic_map, mask, angle = 'rad', hemisphere = hemisphere)
                         else:
-                            overlap = calculate_overlap(predicted_map_1, predicted_map_2, retinotopic_map, mask, angle = 'original')
+                            overlap = calculate_overlap(predicted_map_1, predicted_map_2, retinotopic_map, mask, angle = 'original', hemisphere = hemisphere)
                         theta_pred_across_temp.append(overlap)
             theta_acrosssubj_pred.append(theta_pred_across_temp)
 
