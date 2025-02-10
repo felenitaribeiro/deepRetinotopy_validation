@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import warnings
 import sys
 sys.path.append('..')
-from functions.model_selection import discretize
+from functions.evaluation import discretize
 from nilearn import plotting
 from matplotlib.colors import ListedColormap
 

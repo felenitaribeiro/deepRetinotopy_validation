@@ -170,6 +170,26 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
     dev_set = ['186949', '169747', '826353', '825048', '671855',
                     '751550', '318637', '131722', '137128', '706040'] 
     
+
+    # Region of interest 
+    # Region of interest used for training
+    final_mask_L_ROI, final_mask_R_ROI, index_L_mask, index_R_mask = roi(['ROI'])
+    ROI_masked = np.zeros((32492, 1))
+    # Early visual cortex
+    final_mask_L, final_mask_R, index_L_mask, index_R_mask = roi_earlyvisualcortex(['ROI'])
+    earlyVisualCortex = np.zeros((32492, 1))
+    # Hemisphere
+    if hemisphere == 'lh':
+        ROI_masked[final_mask_L_ROI == 1] = 1
+        earlyVisualCortex[final_mask_L == 1] = 1
+    else: 
+        ROI_masked[final_mask_R_ROI == 1] = 1
+        earlyVisualCortex[final_mask_R == 1] = 1
+    # Final mask (selecting V1-V3 vertices)
+    mask = ROI_masked + earlyVisualCortex
+    mask = mask[ROI_masked == 1]
+    mask = mask > 1
+
     # Number of nodes
     number_cortical_nodes = int(64984)
     number_hemi_nodes = int(number_cortical_nodes / 2)
@@ -177,27 +197,6 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
     for model in range(5):
         theta_withinsubj = []
         theta_acrosssubj_pred = []
-
-        # Region of interest used for training
-        ROI = ['ROI']
-        final_mask_L_ROI, final_mask_R_ROI, index_L_mask, index_R_mask = roi(
-            ROI)
-        ROI_masked = np.zeros((32492, 1))
-        # Early visual cortex
-        final_mask_L, final_mask_R, index_L_mask, index_R_mask = roi_earlyvisualcortex(['ROI'])
-        earlyVisualCortex = np.zeros((32492, 1))
-
-        if hemisphere == 'lh':
-            ROI_masked[final_mask_L_ROI == 1] = 1
-            earlyVisualCortex[final_mask_L == 1] = 1
-        else: 
-            ROI_masked[final_mask_R_ROI == 1] = 1
-            earlyVisualCortex[final_mask_R == 1] = 1
-
-        # Final mask (selecting V1-V3 vertices)
-        mask = ROI_masked + earlyVisualCortex
-        mask = mask[ROI_masked == 1]
-        mask = mask > 1
 
         for j in range(len(dev_set)):
             theta_pred_across_temp = []
@@ -257,8 +256,8 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
                     if retinotopic_map == 'polarAngle' and hemisphere == 'lh':
                         predicted_map_1 = transform_polarangle(predicted_map_1)
                         predicted_map_2 = transform_polarangle(predicted_map_2)
-                    assert np.min(predicted_map_1[mask]) > 0
-                    assert np.min(predicted_map_2[mask]) > 0
+                    assert np.min(predicted_map_1[mask]) >= 0.
+                    assert np.min(predicted_map_2[mask]) >= 0.
                     
                     # Transforming to radians
                     if retinotopic_map == 'polarAngle' or retinotopic_map == 'eccentricity':
@@ -341,4 +340,130 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
     plt.show()
     return df
 
+def return_list_of_subs(dataset_name):
+    if dataset_name == 'hcp':
+        list_of_subs = ['680957', '191841', '617748', '725751', '198653',
+                         '191336', '572045', '601127', '644246', '157336']
+    else:
+        # TODO
+        if dataset_name == 'bla':
+            path = ''
+            list_of_subs = os.listdir(path)
+    return list_of_subs
 
+def predicted_vs_empirical(path, dataset_name, retinotopic_maps, hemispheres):
+    """Calculate the error between predicted and empirical maps for different models.
+    
+    Args:
+        path (str): Path to the Freesurfer directory (both empirical and predicted maps should be 
+            located at the deepRetinotopy folder within the individual's directory)
+        list_of_sub_ids (list): List of subject IDs
+        retinotopic_maps (list): List of retinotopic maps ('polarAngle', 'eccentricity' or 'pRFsize')
+        hemispheres (str): Hemisphere ('lh', 'rh' or 'both')
+
+    Returns:
+        plt (matplotlib.pyplot): Scatter plot of the predicted vs empirical maps. 
+            PNG file saved at the output folder.
+    """
+
+    # Number of nodes
+    number_cortical_nodes = int(64984)
+    number_hemi_nodes = int(number_cortical_nodes / 2)
+
+    # Use data from both hemispheres or not
+    if hemispheres == 'both':
+        hemispheres = ['lh', 'rh']
+    elif hemispheres == 'lh' or hemispheres == 'rh':
+        hemispheres = [hemispheres]
+
+    # TODO
+    model = 1
+
+    # Region of interest
+    # Region of interest used for training
+    final_mask_L_ROI, final_mask_R_ROI, index_L_mask, index_R_mask = roi(['ROI'])
+    ROI_masked = np.zeros((32492, 1))
+    # Early visual cortex
+    final_mask_L, final_mask_R, index_L_mask, index_R_mask = roi_earlyvisualcortex(['ROI'])
+    earlyVisualCortex = np.zeros((32492, 1))
+
+    # Make output directory
+    if os.path.isdir('../output/model_evaluation/' + dataset_name) == False:
+        os.mkdir('../output/model_evaluation/' + dataset_name)
+
+    # List of subjects
+    list_of_sub_ids = return_list_of_subs(dataset_name)
+
+    for retinotopic_map in retinotopic_maps:
+        predicted_map = []
+        empirical_map = []
+        for hemisphere in hemispheres:
+            predicted_map_hemi = []
+            empirical_map_hemi = []
+            if hemisphere == 'lh':
+                ROI_masked[final_mask_L_ROI == 1] = 1
+                earlyVisualCortex[final_mask_L == 1] = 1
+            else: 
+                ROI_masked[final_mask_R_ROI == 1] = 1
+                earlyVisualCortex[final_mask_R == 1] = 1
+
+            # Final mask (selecting V1-V3 vertices)
+            mask = ROI_masked + earlyVisualCortex
+            mask = mask[ROI_masked == 1]
+            mask = mask > 1
+
+            for i in range(len(list_of_sub_ids)):
+                tmp_predicted_map = np.array(nib.load(osp.join(path, list_of_sub_ids[i] + '.fs_predicted_' + 
+                                                    retinotopic_map + '_' + hemisphere + '_curvatureFeat_model' + str(model + 1) + '.func.gii')).agg_data()).reshape(
+                                                    number_hemi_nodes, -1)[ROI_masked == 1]
+                tmp_empirical_map = np.array(nib.load(osp.join(path, list_of_sub_ids[i] + '.fs_empirical_' + 
+                                                    retinotopic_map + '_' + hemisphere + '.func.gii')).agg_data()).reshape(
+                                                    number_hemi_nodes, -1)[ROI_masked == 1]
+                if retinotopic_map == 'polarAngle' and hemisphere == 'lh':
+                    tmp_predicted_map = transform_polarangle(tmp_predicted_map)
+                    tmp_empirical_map = transform_polarangle(tmp_empirical_map)
+                
+                predicted_map_hemi.append(tmp_predicted_map)
+                empirical_map_hemi.append(tmp_empirical_map)
+            predicted_map = predicted_map + list(np.array(predicted_map_hemi).flatten())
+            empirical_map = empirical_map + list(np.array(empirical_map_hemi).flatten())
+        
+        data = {'predicted_map': predicted_map, 'empirical_map': empirical_map}
+        data = pd.DataFrame(data)
+        fig = plt.figure()
+        sns.kdeplot(x = data['predicted_map'], y = data['empirical_map'],cmap="Blues", fill=True, thresh=0,cbar=True)
+
+        if retinotopic_map ==  'polarAngle':
+            plt.plot([0, 360], [0, 360], 'k--')
+            plt.ylim(0,360)
+            plt.xlim(0,360)
+            if len(hemispheres) > 1:
+                fig.suptitle('Polar Angle')
+            else:
+                fig.suptitle('Polar Angle - ' + hemispheres[0])
+        elif retinotopic_map == 'eccentricity':
+            plt.plot([0, 10], [0, 10], 'k--')
+            plt.ylim(0,10)
+            plt.xlim(0,10)
+            if len(hemispheres) > 1:
+                fig.suptitle('Eccentricity')
+            else:
+                fig.suptitle('Eccentricity - ' + hemispheres[0])
+
+        elif retinotopic_map == 'pRFsize':
+            plt.plot([0, 3], [0, 3], 'k--')
+            plt.ylim(0,3)
+            plt.xlim(0,3)
+            if len(hemispheres) > 1:
+                fig.suptitle('pRF size')
+            else:
+                fig.suptitle('pRF size - ' + hemispheres[0])
+    
+        if len(hemispheres) > 1:
+            plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_both.png')
+            plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_both.pdf')
+        else:
+            plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_' + hemispheres[0] + '.png')
+            plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_' + hemispheres[0] + '.pdf')
+        plt.show()
+    return
