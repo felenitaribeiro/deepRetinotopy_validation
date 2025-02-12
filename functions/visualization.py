@@ -135,14 +135,14 @@ def retinotopic_map_plot(subject_id, path, template_path, prediction = 'average'
 
     # Loading the curvature map
     if hemisphere == 'lh':
-        # background = np.array(nib.load(osp.join(path,
-        #                          subject_id + '/surf/' + subject_id + '.curvature-midthickness.lh.32k_fs_LR.func.gii')).agg_data()).reshape(
-        #                          number_hemi_nodes, -1)
+        background = np.array(nib.load(osp.join(path,
+                                 subject_id + '/surf/' + subject_id + '.curvature-midthickness.lh.32k_fs_LR.func.gii')).agg_data()).reshape(
+                                 number_hemi_nodes, -1)
         background = np.ones((32492, 1))
     else:
-        # background = np.array(nib.load(osp.join(path,
-        #                          subject_id + '/surf/' + subject_id + '.curvature-midthickness.rh.32k_fs_LR.func.gii')).agg_data()).reshape(
-        #                          number_hemi_nodes, -1)
+        background = np.array(nib.load(osp.join(path,
+                                 subject_id + '/surf/' + subject_id + '.curvature-midthickness.rh.32k_fs_LR.func.gii')).agg_data()).reshape(
+                                 number_hemi_nodes, -1)
         background = np.ones((32492, 1))
 
     # Background settings
@@ -161,13 +161,13 @@ def retinotopic_map_plot(subject_id, path, template_path, prediction = 'average'
     data = np.zeros((32492, 1))
     if hemisphere == 'lh':
         if prediction != 'empirical':
-            data = np.array(nib.load(osp.join(path,
+            data = np.array(nib.load(osp.join(path, subject_id + '/deepRetinotopy/' +
                                             subject_id + '.fs_predicted_' + retinotopic_map + '_lh_curvatureFeat_' + prediction + '.func.gii')).agg_data()).reshape(
                                             number_hemi_nodes, -1)
             data[final_mask_L == 1] = np.reshape(data[final_mask_L == 1], (-1, 1))
 
         else:
-            data = np.array(nib.load(osp.join(path,
+            data = np.array(nib.load(osp.join(path, subject_id + '/deepRetinotopy/' +
                                             subject_id + '.fs_empirical_' + retinotopic_map + '_lh_masked.func.gii')).agg_data()).reshape(
                                             number_hemi_nodes, -1)
             data[final_mask_L == 1] = np.reshape(
@@ -198,13 +198,13 @@ def retinotopic_map_plot(subject_id, path, template_path, prediction = 'average'
 
     else:
         if prediction != 'empirical':
-            data = np.array(nib.load(osp.join(path,
+            data = np.array(nib.load(osp.join(path, subject_id + '/deepRetinotopy/' +
                                             subject_id + '.fs_predicted_' + retinotopic_map + '_rh_curvatureFeat_' + prediction + '.func.gii')).agg_data()).reshape(
                                             number_hemi_nodes, -1)
             data[final_mask_R == 1] = np.reshape(data[final_mask_R == 1], (-1, 1))
 
         else:
-            data = np.array(nib.load(osp.join(path,
+            data = np.array(nib.load(osp.join(path, subject_id + '/deepRetinotopy/' +
                                             subject_id + '.fs_empirical_' + retinotopic_map + '_rh_masked.func.gii')).agg_data()).reshape(
                                             number_hemi_nodes, -1)
             data[final_mask_R == 1] = np.reshape(
