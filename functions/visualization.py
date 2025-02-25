@@ -175,11 +175,12 @@ def retinotopic_map_plot(subject_id, path, template_path, prediction = 'average'
             
         if binarize == False:
             if retinotopic_map=='polarAngle':
-                # Reshift values
-                subtract = data >= 180
-                add = data < 180
-                data[subtract] = data[subtract] - 180
-                data[add] = data[add] + 180
+                if prediction != 'empirical':
+                    # Reshift values
+                    subtract = data >= 180
+                    add = data < 180
+                    data[subtract] = data[subtract] - 180
+                    data[add] = data[add] + 180
                 # Masking
                 data = np.array(data) + threshold
                 data[final_mask_L != 1] = 0

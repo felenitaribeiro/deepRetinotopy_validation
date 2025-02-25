@@ -80,7 +80,7 @@ do
                 elif [ $metric == "sigma" ]; then
                     metric_new="pRFsize"
                 elif [ $metric == "vexpl" ]; then
-                    metric_new="explainedVariance"
+                    metric_new="variance_explained"
                 elif [ $metric == "x0" ]; then
                     metric_new="x0"
                 elif [ $metric == "y0" ]; then
