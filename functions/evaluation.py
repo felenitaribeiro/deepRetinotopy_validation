@@ -12,6 +12,8 @@ sys.path.append('..')
 from deepRetinotopy_TheToolbox.utils.metrics import smallest_angle
 from deepRetinotopy_TheToolbox.utils.rois import ROI_WangParcelsPlusFovea as roi
 from sklearn.metrics import jaccard_score
+from nilearn.glm.first_level.hemodynamic_models import _gamma_difference_hrf
+from scipy.stats import multivariate_normal
 
 
 def roi_earlyvisualcortex(list_of_labels):
@@ -626,4 +628,74 @@ def explainedvariance_vs_error(path, retinotopic_map, hemisphere, threshold = 10
         plt.savefig('../output/error_vs_explained_variance/' + retinotopic_map + '_' + hemisphere + '_Seed' + str(model + 1) + '.pdf')
         plt.show()
     return
+
+
+
+def variance_explained(stim_time, x, y, stim_img, fmri_data, tr, y_coord, x_coord, pRFsize):
+    '''
+    Calculate the variance explained using pRF model to predict the fMRI data.
+
+    Args:
+        stim_time (np.array): Time of the stimulus
+        x (np.array): x coordinate of the stimulus
+        y (np.array): y coordinate of the stimulus
+        stim_img (np.array): Stimulus image
+        fmri_data (np.array): fMRI data
+        tr (float): Repetition time
+        y_coord (np.array): y coordinate of the pRF
+        x_coord (np.array): x coordinate of the pRF
+        pRFsize (np.array): pRF size
+
+    Returns:
+        variance_explained (np.array): Variance explained by the pRF model
+    '''
+
+    # Generate HRF
+    t_max = int(np.max(stim_time)) + 1
+    hrf = _gamma_difference_hrf(tr=tr, time_length=t_max, onset=0.1, 
+                                  delay = 6.68, undershoot=14.66, dispersion=1.82, u_dispersion=3.15,
+                                  ratio=1/3.08)
     
+    # Interpolate HRF to match stimulus time
+    hrf_function = scipy.interpolate.interp1d(np.linspace(0, t_max, len(hrf)), hrf)
+    new_hrf = hrf_function(stim_time)
+    new_hrf = np.reshape(new_hrf, (1, -1))
+
+    # Generate x and y grid
+    pos = np.dstack((x, y))
+    
+    # Compute variance explained of the pRF model with provided pRF parameters
+    variance_explained_ = []
+    for i in range(len(x_coord)):
+        X0 = x_coord[i]
+        Y0 = y_coord[i]
+        sigma = pRFsize[i]
+        mean = [X0, Y0]
+        covariance = [[sigma, 0], [0, sigma]] 
+
+        # Generate 2D Gaussian
+        rv = multivariate_normal(mean, covariance)
+        gaussian_2d = rv.pdf(pos)
+
+        # Determine the overlap between the stimulus and the pRF and calculate the spatial summation
+        overlap = stim_img * gaussian_2d[:,:,np.newaxis]
+        overlap = np.sum(overlap, axis=(0,1))
+
+        # Convolve the timeseries from the previous step with the HRF
+        predicted_signal = np.convolve(overlap, new_hrf[0])[0:len(overlap)]
+
+        # Interpolate the predicted signal to match the fmri data
+        bold_func_pred = scipy.interpolate.interp1d(np.linspace(0, t_max, len(predicted_signal)), predicted_signal)
+        predicted_signal = bold_func_pred(np.linspace(0, t_max, int(t_max/tr)))
+
+        # Calculate variance explained
+        if np.std(predicted_signal) == 0:
+            corr = 0
+        else:
+            norm_predicted_signal = (predicted_signal - np.mean(predicted_signal)) / np.std(predicted_signal)
+            norm_fmri_data = (fmri_data[i] - np.mean(fmri_data[i])) / np.std(fmri_data[i])
+            corr = np.corrcoef(norm_predicted_signal, norm_fmri_data)[0,1]
+            
+        variance_explained_.append(corr**2)
+
+    return variance_explained_

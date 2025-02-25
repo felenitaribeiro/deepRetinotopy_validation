@@ -1,2 +1,7 @@
 /datasets/*
 /templates/*
+/HCP/*
+/output/*
+/functions/__pycache__/*
+/deepRetinotopy_TheToolbox/*
+/*.zip
