@@ -11,6 +11,7 @@ import scipy
 sys.path.append('..')
 from deepRetinotopy_TheToolbox.utils.metrics import smallest_angle
 from deepRetinotopy_TheToolbox.utils.rois import ROI_WangParcelsPlusFovea as roi
+from deepRetinotopy_TheToolbox.utils.rois import ROIs_WangParcels as roi_parcel
 from sklearn.metrics import jaccard_score
 from nilearn.glm.first_level.hemodynamic_models import _gamma_difference_hrf
 from scipy.stats import multivariate_normal
@@ -111,6 +112,7 @@ def calculate_overlap(map_1, map_2, retinotopic_map, mask, angle = 'rad', hemisp
         retinotopic_map (str): Type of retinotopic map ('polarAngle', 'eccentricity' or 'pRFsize')
         mask (numpy array): Mask of the region of interest
         angle (str): Units of the angle (rad or original)
+        hemisphere (str): Hemisphere ('lh' or 'rh')
     
     Returns:
         score (float): Overlap between the two retinotopic maps
@@ -141,11 +143,12 @@ def transform_polarangle(data):
     Returns:
         data (numpy array): Transformed polar angle values
     """
-
+    mask = data < 0
     subtract = data > 180
     add = data < 180
     data[subtract] = data[subtract] - 180
     data[add] = data[add] + 180
+    data[mask] = -1
     return data
 
 def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mapping = 'continuous', threshold = 10):
@@ -158,6 +161,7 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
         retinotopic_map (str): Type of retinotopic map ('polarAngle', 'eccentricity' or 'pRFsize')
         hemisphere (str): Hemisphere ('lh' or 'rh')
         retinotopic_mapping (str): Type of retinotopic mapping ('continuous' or 'discrete')
+        threshold (float): Threshold for the explained variance
 
     Returns:
         df (pandas dataframe): Dataframe containing the inter-individual variability in predicted maps 
@@ -172,8 +176,7 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
     dev_set = ['186949', '169747', '826353', '825048', '671855',
                     '751550', '318637', '131722', '137128', '706040'] 
     
-
-    # Region of interest 
+    ## Region of interest 
     # Region of interest used for training
     final_mask_L_ROI, final_mask_R_ROI, index_L_mask, index_R_mask = roi(['ROI'])
     ROI_masked = np.zeros((32492, 1))
@@ -215,10 +218,10 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
                                      hemisphere + '.func.gii')).agg_data()).reshape(
                                         number_hemi_nodes, -1)[ROI_masked == 1][mask]
 
-                    # Transform polar angle values from lh
+                    # # Transform polar angle values from lh
                     if retinotopic_map == 'polarAngle' and hemisphere == 'lh':
-                        predicted_map = transform_polarangle(predicted_map) #TODO
-                        # empirical_map = transform_polarangle(empirical_map)
+                        predicted_map = transform_polarangle(predicted_map) 
+                        empirical_map = transform_polarangle(empirical_map)
 
                     assert np.min(predicted_map[mask]) >= 0.
                     assert np.min(empirical_map[mask]) >= 0.
@@ -352,17 +355,30 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
     plt.show()
     return df
 
+
 def return_list_of_subs(dataset_name):
+    """Return the list of subject IDs for the dataset.
+
+    Args:
+        dataset_name (str): Name of the dataset ('hcp', 'logbar' or 'nyu')
+
+    Returns:
+        list_of_subs (list): List of subject IDs
+    """
+
     if dataset_name == 'hcp':
         list_of_subs = ['680957', '191841', '617748', '725751', '198653',
                          '191336', '572045', '601127', '644246', '157336']
     else:
         if dataset_name == 'logbar':
-            path = '/BULK/ribeiro/datasets/ds004698/derivatives/freesurfer/'
+            path = '/BULK/LABDATA/openneuro/ds004698/derivatives/freesurfer/'
+            list_of_subs = os.listdir(path)
+        elif dataset_name == 'nyu':
+            path = '/BULK/ribeiro/datasets/ds003787/derivatives/freesurfer/'
             list_of_subs = os.listdir(path)
     return list_of_subs
 
-def predicted_vs_empirical(path, dataset_name, retinotopic_maps, hemispheres, threshold = None,):
+def predicted_vs_empirical(path, dataset_name, retinotopic_maps, hemispheres, threshold = None, experiment = None, region_of_interest = 'all'):
     """Calculate the error between predicted and empirical maps for different models.
     
     Args:
@@ -371,6 +387,9 @@ def predicted_vs_empirical(path, dataset_name, retinotopic_maps, hemispheres, th
         list_of_sub_ids (list): List of subject IDs
         retinotopic_maps (list): List of retinotopic maps ('polarAngle', 'eccentricity' or 'pRFsize')
         hemispheres (str): Hemisphere ('lh', 'rh' or 'both')
+        threshold (float): Threshold for the explained variance
+        experiment (str): Experiment name (only for the logbar dataset)
+        roi (str): Region of interest ('all', 'earlyvisualcortex', 'V1', 'V2' or 'V3')
 
     Returns:
         plt (matplotlib.pyplot): Scatter plot of the predicted vs empirical maps. 
@@ -387,11 +406,21 @@ def predicted_vs_empirical(path, dataset_name, retinotopic_maps, hemispheres, th
     elif hemispheres == 'lh' or hemispheres == 'rh':
         hemispheres = [hemispheres]
 
-    # Region of interest
+    ## Region of interest
     # Region of interest used for training
     final_mask_L_ROI, final_mask_R_ROI, index_L_mask, index_R_mask = roi(['ROI'])
     # Early visual cortex
     final_mask_L, final_mask_R, index_L_mask, index_R_mask = roi_earlyvisualcortex(['ROI'])
+    print('Region of interest: ' + region_of_interest)
+
+    if region_of_interest != 'all' and region_of_interest != 'earlyvisualcortex':
+        if region_of_interest == 'V1':
+            areas = ['V1v', 'V1d']
+        elif region_of_interest == 'V2':
+            areas = ['V2v', 'V2d']
+        elif region_of_interest == 'V3':
+            areas = ['V3v', 'V3d']
+        final_mask_L, final_mask_R, index_L_mask, index_R_mask = roi_parcel(areas)
 
     # Make output directory
     if os.path.isdir('../output/model_evaluation/' + dataset_name) == False:
@@ -405,58 +434,75 @@ def predicted_vs_empirical(path, dataset_name, retinotopic_maps, hemispheres, th
         empirical_map = []
         for hemisphere in hemispheres:
             ROI_masked = np.zeros((32492, 1))
-            earlyVisualCortex = np.zeros((32492, 1))
+            visualarea = np.zeros((32492, 1))
             predicted_map_hemi = []
             empirical_map_hemi = []
             if hemisphere == 'lh':
                 ROI_masked[final_mask_L_ROI == 1] = 1
-                earlyVisualCortex[final_mask_L == 1] = 1
+                visualarea[final_mask_L == 1] = 1
             else: 
                 ROI_masked[final_mask_R_ROI == 1] = 1
-                earlyVisualCortex[final_mask_R == 1] = 1
+                visualarea[final_mask_R == 1] = 1
 
-            # Final mask (selecting V1-V3 vertices)
-            mask = ROI_masked + earlyVisualCortex
-            mask = mask[ROI_masked == 1]
-            mask = mask > 1
+            # Final mask 
+            mask = ROI_masked + visualarea
+            mask = mask == 2
+
+            if region_of_interest == 'all':
+                mask_final = ROI_masked
+            else:
+                mask_final = mask
 
             for i in range(len(list_of_sub_ids)):
+                # Load predicted maps
                 tmp_predicted_map = np.array(nib.load(osp.join(path, list_of_sub_ids[i] + '/deepRetinotopy/' + list_of_sub_ids[i] + '.fs_predicted_' + 
                                                     retinotopic_map + '_' + hemisphere + '_curvatureFeat_model.func.gii')).agg_data()).reshape(
-                                                    number_hemi_nodes, -1)[ROI_masked == 1]
+                                                    number_hemi_nodes, -1)[mask_final == 1]
+                # Load empirical maps
                 if dataset_name == 'hcp':
                     tmp_empirical_map = np.array(nib.load(osp.join(path, list_of_sub_ids[i] + '/deepRetinotopy/' + list_of_sub_ids[i] + '.fs_empirical_' + 
                                                     retinotopic_map + '_' + hemisphere + '.func.gii')).agg_data()).reshape(
-                                                    number_hemi_nodes, -1)[ROI_masked == 1]
+                                                    number_hemi_nodes, -1)[mask_final == 1]
                 elif dataset_name == 'logbar':
                     tmp_empirical_map = np.array(nib.load(osp.join(path, list_of_sub_ids[i] + '/surf/' + list_of_sub_ids[i] + '.fs_empirical_' + 
-                                                        retinotopic_map + '_' + hemisphere + '_transformed.func.gii')).agg_data()).reshape(
-                                                        number_hemi_nodes, -1)[ROI_masked == 1]
-                    
+                                                            retinotopic_map + '_' + experiment + '_' + hemisphere + '.func.gii')).agg_data()).reshape(
+                                                            number_hemi_nodes, -1)[mask_final == 1]
+                else:
+                    tmp_empirical_map = np.array(nib.load(osp.join(path, list_of_sub_ids[i] + '/surf/' + list_of_sub_ids[i] + '.fs_empirical_' + 
+                                                            retinotopic_map + '_' + hemisphere + '.func.gii')).agg_data()).reshape(
+                                                            number_hemi_nodes, -1)[mask_final == 1]
+                
                 if threshold != None:
                     if dataset_name == 'hcp':
                         data_directory = '/deepRetinotopy/'
                     else:
                         data_directory = '/surf/'
-                    explained_variance = np.array(nib.load(osp.join(path, list_of_sub_ids[i] + data_directory + list_of_sub_ids[i] + '.fs_empirical_variance_explained_' +
-                                                    hemisphere + '.func.gii')).agg_data()).reshape(
-                                                    number_hemi_nodes, -1)[ROI_masked == 1]
-                    tmp_predicted_map = tmp_predicted_map[explained_variance > threshold]
+                    
+                    if dataset_name == 'logbar':
+                        explained_variance = np.array(nib.load(osp.join(path, list_of_sub_ids[i] + data_directory + list_of_sub_ids[i] + '.fs_empirical_variance_explained_' +
+                                                    experiment + '_' + hemisphere + '.func.gii')).agg_data()).reshape(
+                                                    number_hemi_nodes, -1)[mask_final == 1]
+                    else:
+                        explained_variance = np.array(nib.load(osp.join(path, list_of_sub_ids[i] + data_directory + list_of_sub_ids[i] + '.fs_empirical_variance_explained_' +
+                                                        hemisphere + '.func.gii')).agg_data()).reshape(
+                                                        number_hemi_nodes, -1)[mask_final == 1]
+                    tmp_predicted_map = tmp_predicted_map[explained_variance > threshold]              
                     tmp_empirical_map = tmp_empirical_map[explained_variance > threshold]
-                
+
+                # Transform polar angle values from lh to range from 0 to 90 and 270 to 360 degrees
                 if retinotopic_map == 'polarAngle' and hemisphere == 'lh':
-                    tmp_predicted_map = transform_polarangle(tmp_predicted_map) # TODO
-                    # tmp_empirical_map = transform_polarangle(tmp_empirical_map) # empirical maps
+                    tmp_predicted_map = transform_polarangle(tmp_predicted_map) 
+                    tmp_empirical_map = transform_polarangle(tmp_empirical_map) 
                 
-                # second mask
+                # Tmp: Second mask for logbar as the available data has been thresholded
                 if dataset_name == 'logbar':
-                    second_mask = tmp_empirical_map > -1
+                    second_mask = tmp_empirical_map > 0
                     tmp_predicted_map = tmp_predicted_map[second_mask==True]
                     tmp_empirical_map = tmp_empirical_map[second_mask==True]
-
                 
                 predicted_map_hemi = predicted_map_hemi + list(np.array(tmp_predicted_map).flatten())
                 empirical_map_hemi = empirical_map_hemi + list(np.array(tmp_empirical_map).flatten())
+
             predicted_map = predicted_map + list(np.array(predicted_map_hemi).flatten())
             empirical_map = empirical_map + list(np.array(empirical_map_hemi).flatten())
         
@@ -465,7 +511,8 @@ def predicted_vs_empirical(path, dataset_name, retinotopic_maps, hemispheres, th
         data = {'predicted_map': predicted_map, 'empirical_map': empirical_map}
         data = pd.DataFrame(data)
         fig = plt.figure()
-        sns.kdeplot(x = data['predicted_map'], y = data['empirical_map'],cmap="Blues", fill=True, thresh=0,cbar=True)
+        sns.kdeplot(x = data['predicted_map'], y = data['empirical_map'],cmap="Blues", fill=True,cbar=True)
+        # plt.scatter(data['predicted_map'], data['empirical_map'], s=5, c='.1')
 
         if retinotopic_map ==  'polarAngle':
             plt.plot([0, 360], [0, 360], 'k--')
@@ -493,20 +540,28 @@ def predicted_vs_empirical(path, dataset_name, retinotopic_maps, hemispheres, th
             else:
                 fig.suptitle('pRF size - ' + hemispheres[0])
 
+        # experiment name to file
+        if dataset_name == 'logbar':
+                experiment_name = experiment + '_'
+        else:
+                experiment_name = ''
+        
+
         if len(hemispheres) > 1:
             if threshold != None:
-                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_both_' + str(threshold) + '.png')
-                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_both_' + str(threshold) + '.pdf')
+                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_' + experiment_name + 'both_' + str(threshold) + '_' + region_of_interest + '.png')
+                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_'+ experiment_name + 'both_' + str(threshold) + '_' + region_of_interest + '.pdf')
             else:
-                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_both.png')
-                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_both.pdf')       
+                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_' + experiment_name + 'both' + '_' + region_of_interest + '.png')
+                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_' + experiment_name + 'both' + '_' + region_of_interest + '.pdf')       
         else:
+
             if threshold != None:
-                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_' + hemispheres[0] + '_' + str(threshold) + '.png')
-                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_' + hemispheres[0] + '_' + str(threshold) + '.pdf')
+                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_' + experiment_name + hemispheres[0] + '_' + str(threshold) + '_' + region_of_interest + '.png')
+                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_' + experiment_name + hemispheres[0] + '_' + str(threshold) + '_' + region_of_interest + '.pdf')
             else:
-                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_' + hemispheres[0] + '.png')
-                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_' + hemispheres[0] + '.pdf')
+                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_' + experiment_name + hemispheres[0] + '_' + region_of_interest + '.png')
+                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_' + experiment_name + hemispheres[0] + '_' + region_of_interest + '.pdf')
         plt.show()
     return
 
@@ -519,6 +574,7 @@ def explainedvariance_vs_error(path, retinotopic_map, hemisphere, threshold = 10
             located at the deepRetinotopy folder within the individual's directory)
         retinotopic_map (str): Type of retinotopic map ('polarAngle', 'eccentricity' or 'pRFsize')
         hemisphere (str): Hemisphere ('lh' or 'rh')
+        threshold (float): Threshold for the explained variance
 
     Returns:
         plt (matplotlib.pyplot): Plot of the error vs explained variance.
@@ -528,8 +584,7 @@ def explainedvariance_vs_error(path, retinotopic_map, hemisphere, threshold = 10
     dev_set = ['186949', '169747', '826353', '825048', '671855',
                     '751550', '318637', '131722', '137128', '706040'] 
     
-
-    # Region of interest 
+    ## Region of interest 
     # Region of interest used for training
     final_mask_L_ROI, final_mask_R_ROI, index_L_mask, index_R_mask = roi(['ROI'])
     ROI_masked = np.zeros((32492, 1))
@@ -572,8 +627,8 @@ def explainedvariance_vs_error(path, retinotopic_map, hemisphere, threshold = 10
 
                     # Transform polar angle values from lh
                     if retinotopic_map == 'polarAngle' and hemisphere == 'lh':
-                        predicted_map = transform_polarangle(predicted_map) # TODO
-                        # empirical_map = transform_polarangle(empirical_map) 
+                        predicted_map = transform_polarangle(predicted_map) 
+                        empirical_map = transform_polarangle(empirical_map) 
 
                     assert np.min(predicted_map[mask]) >= 0.
                     assert np.min(empirical_map[mask]) >= 0.
@@ -698,4 +753,4 @@ def variance_explained(stim_time, x, y, stim_img, fmri_data, tr, y_coord, x_coor
             
         variance_explained_.append(corr**2)
 
-    return variance_explained_
+    return np.array(variance_explained_)
