@@ -255,7 +255,7 @@ def retinotopic_map_plot(subject_id, path, template_path, prediction = 'average'
     elif retinotopic_map == 'eccentricity':
         max_value = 15
     else:
-        max_value = 8
+        max_value = 20
 
     colour = 'gist_rainbow_r'
     if hemisphere == 'lh':
