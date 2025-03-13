@@ -101,15 +101,19 @@ do
                     "$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/$subject/ses-nyu3t01/"$hemisphere"."$metric".gii \
                 
                 # Transform polar angle data before resampling
-                if [ $metric == "angle" ]; then
-                    python -c "import sys; sys.path.append('/home/ribeiro/Projects/deepRetinotopy_validation/'); from functions.preprocess import transform_angle_nyu; transform_angle_nyu('"$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/$subject/ses-nyu3t01/"$hemisphere"."$metric".gii', '$hemisphere')"
-                fi
-                
                 echo "Resampling native data to fsaverage space..."
-                wb_command -metric-resample "$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/$subject/ses-nyu3t01/"$hemisphere"."$metric"_transformed.gii \
+                if [ $metric == "angle" ]; then
+                    python -c "import sys; sys.path.append('/home/ribeiro/Projects/deepRetinotopy_validation/'); from functions.preprocess import transform_angle; transform_angle('"$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/$subject/ses-nyu3t01/"$hemisphere"."$metric".gii', '$hemisphere')"
+                    wb_command -metric-resample "$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/$subject/ses-nyu3t01/"$hemisphere"."$metric"_transformed.gii \
                     "$dataDir"/"$projectDir"/derivatives/freesurfer/$subject/surf/"$hemisphere".sphere.reg.surf.gii /home/ribeiro/Projects/deepRetinotopy_validation/templates/fs_LR-deformed_to-fsaverage."$hemi".sphere.32k_fs_LR.surf.gii \
                     ADAP_BARY_AREA "$dataDir"/"$projectDir"/derivatives/freesurfer/$subject/surf/"$subject".fs_empirical_"$metric_new"_"$hemisphere".func.gii \
-                    -area-surfs "$dataDir"/"$projectDir"/derivatives/freesurfer/$subject/surf/"$hemisphere".midthickness.surf.gii $subject/surf/"$subject"."$hemisphere".midthickness.32k_fs_LR.surf.gii            
+                    -area-surfs "$dataDir"/"$projectDir"/derivatives/freesurfer/$subject/surf/"$hemisphere".midthickness.surf.gii $subject/surf/"$subject"."$hemisphere".midthickness.32k_fs_LR.surf.gii         
+                else
+                    wb_command -metric-resample "$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/$subject/ses-nyu3t01/"$hemisphere"."$metric".gii \
+                        "$dataDir"/"$projectDir"/derivatives/freesurfer/$subject/surf/"$hemisphere".sphere.reg.surf.gii /home/ribeiro/Projects/deepRetinotopy_validation/templates/fs_LR-deformed_to-fsaverage."$hemi".sphere.32k_fs_LR.surf.gii \
+                        ADAP_BARY_AREA "$dataDir"/"$projectDir"/derivatives/freesurfer/$subject/surf/"$subject".fs_empirical_"$metric_new"_"$hemisphere".func.gii \
+                        -area-surfs "$dataDir"/"$projectDir"/derivatives/freesurfer/$subject/surf/"$hemisphere".midthickness.surf.gii $subject/surf/"$subject"."$hemisphere".midthickness.32k_fs_LR.surf.gii            
+                fi
             done
         done
     fi

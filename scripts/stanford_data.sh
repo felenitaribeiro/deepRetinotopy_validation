@@ -1,0 +1,154 @@
+ml connectomeworkbench/1.5.0
+ml freesurfer/7.3.2
+ml deepretinotopy/1.0.8
+
+dataDir=/BULK/LABDATA/openneuro/stanford-data/
+mkdir -p $dataDir
+projectURL=https://github.com/OpenNeuroDatasets/ds004440.git
+projectDir=${projectURL:37:-4} # after slash before .git
+cd $dataDir
+echo `pwd $dataDir`
+
+datalad install $projectURL
+
+# Dataset download
+echo "--------------------------------------------------------------------------------"
+echo "[Step 1] Data download..."
+echo "--------------------------------------------------------------------------------"
+cd "$dataDir"/"$projectDir"/derivatives/freesurfer
+echo `pwd .`
+for subject in `ls .`; 
+do
+    if [ ${subject:0:3} != "sub" ]; then
+        continue
+    else
+        for hemisphere in lh rh; 
+        do
+            if [ $hemisphere == "lh" ]; then
+                hemi="L"
+            else
+                hemi="R"
+            fi
+            # freesurfer data
+            datalad get "$subject"/surf/"$hemisphere".white
+            if [ -L "$subject"/surf/"$hemisphere".pial.T1 ]; then
+                datalad get "$subject"/surf/"$hemisphere".pial.T1
+                ln -sf "$subject"/surf/"$hemisphere".pial.T1 "$subject"/surf/"$hemisphere".pial
+            else
+                datalad get "$subject"/surf/"$hemisphere".pial
+            fi
+            datalad get "$subject"/surf/"$hemisphere".sphere
+            datalad get "$subject"/surf/"$hemisphere".sphere.reg
+            datalad get "$subject"/surf/"$hemisphere".thickness
+        done
+    fi
+done
+# prf estimates
+datalad get "$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/"$data_folder"/children/*
+datalad get "$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/"$data_folder"/adults/*
+
+cd "$dataDir"/"$projectDir"/
+datalad unlock .
+
+Convert the retinotopy data to .gii format in the fs_32k space
+echo "--------------------------------------------------------------------------------"
+echo "[Step 2] Register data from native space to fs_average space..."
+echo "--------------------------------------------------------------------------------"
+cd "$dataDir"/"$projectDir"/derivatives/freesurfer
+for subject in `ls .`;
+do
+    if [ ${subject:0:3} != "sub" ]; then
+        continue
+    else
+        for hemisphere in lh rh;
+        do
+            if [ $hemisphere == "lh" ]; then
+                hemi="L"
+            else
+                hemi="R"
+            fi
+
+            echo "Generate midthickness surface..."
+            echo `pwd .`
+            mris_convert "$subject"/surf/"$hemisphere".white "$subject"/surf/"$hemisphere".white.gii
+            if [ -f "$subject"/surf/"$hemisphere".pial.T1 ]; then
+                mris_convert "$subject"/surf/"$hemisphere".pial.T1 "$subject"/surf/"$hemisphere".pial.gii
+            else
+                mris_convert "$subject"/surf/"$hemisphere".pial "$subject"/surf/"$hemisphere".pial.gii
+            fi
+
+            /home/ribeiro/Projects/deepRetinotopy_validation/deepRetinotopy_TheToolbox/utils/midthickness_surf.py --path "$subject"/surf/ --hemisphere $hemisphere # to edit after deepRetinotopy container is updated
+            mris_convert "$subject"/surf/"$hemisphere".graymid.gii "$subject"/surf/"$hemisphere".graymid
+            mris_curvature -w "$subject"/surf/"$hemisphere".graymid
+
+            echo "Resampling native surface to fs_LR space..."
+            if [ -f "$subject"/surf/"$hemisphere".pial.T1 ]; then
+                wb_shortcuts -freesurfer-resample-prep "$subject"/surf/"$hemisphere".white "$subject"/surf/"$hemisphere".pial.T1 \
+                    "$subject"/surf/"$hemisphere".sphere.reg /home/ribeiro/Projects/deepRetinotopy_validation/templates/fs_LR-deformed_to-fsaverage."$hemi".sphere.32k_fs_LR.surf.gii \
+                    "$subject"/surf/"$hemisphere".midthickness.surf.gii "$subject"/surf/"$subject"."$hemisphere".midthickness.32k_fs_LR.surf.gii \
+                    "$subject"/surf/"$hemisphere".sphere.reg.surf.gii
+            else
+                wb_shortcuts -freesurfer-resample-prep "$subject"/surf/"$hemisphere".white "$subject"/surf/"$hemisphere".pial \
+                    "$subject"/surf/"$hemisphere".sphere.reg /home/ribeiro/Projects/deepRetinotopy_validation/templates/fs_LR-deformed_to-fsaverage."$hemi".sphere.32k_fs_LR.surf.gii \
+                    "$subject"/surf/"$hemisphere".midthickness.surf.gii "$subject"/surf/"$subject"."$hemisphere".midthickness.32k_fs_LR.surf.gii \
+                    "$subject"/surf/"$hemisphere".sphere.reg.surf.gii
+            fi
+        done
+    fi
+done
+
+for hemisphere in lh rh;
+do
+    if [ $hemisphere == "lh" ]; then
+        hemi="L"
+    else
+        hemi="R"
+    fi
+    for metric in angle;
+    do
+        if [ $metric == "angle" ]; then
+            metric_new="polarAngle"
+        elif [ $metric == "eccen" ]; then
+            metric_new="eccentricity"
+        elif [ $metric == "sigma" ]; then
+            metric_new="pRFsize"
+        elif [ $metric == "vexpl" ]; then
+            metric_new="variance_explained"
+        elif [ $metric == "x" ]; then
+            metric_new="x0"
+        elif [ $metric == "y" ]; then
+            metric_new="y0"
+        fi
+
+        echo "Converting $metric data to .gii format..."
+        for data_folder in adults children; do
+            cd "$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/"$data_folder"/
+            for subject in `ls .`; do
+                mris_convert -c "$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/"$data_folder"/"$subject"/"$hemisphere"."$metric".mgz "$dataDir"/"$projectDir"/derivatives/freesurfer/"$subject"/surf/"$hemisphere".white \
+                    "$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/"$data_folder"/"$subject"/"$hemisphere"."$metric".gii \
+                
+                echo "Resampling native data to fsaverage space..."
+                # Transform polar angle data before resampling
+                if [ $metric == "angle" ]; then
+                    python -c "import sys; sys.path.append('/home/ribeiro/Projects/deepRetinotopy_validation/'); from functions.preprocess import transform_angle; transform_angle('"$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/"$data_folder"/"$subject"/"$hemisphere"."$metric".gii', '$hemisphere')"
+                    wb_command -metric-resample "$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/"$data_folder"/"$subject"/"$hemisphere"."$metric"_transformed.gii \
+                        "$dataDir"/"$projectDir"/derivatives/freesurfer/"$subject"/surf/"$hemisphere".sphere.reg.surf.gii /home/ribeiro/Projects/deepRetinotopy_validation/templates/fs_LR-deformed_to-fsaverage."$hemi".sphere.32k_fs_LR.surf.gii \
+                        ADAP_BARY_AREA "$dataDir"/"$projectDir"/derivatives/freesurfer/"$subject"/surf/"$subject".fs_empirical_"$metric_new"_"$hemisphere".func.gii \
+                        -area-surfs "$dataDir"/"$projectDir"/derivatives/freesurfer/"$subject"/surf/"$hemisphere".midthickness.surf.gii "$dataDir"/"$projectDir"/derivatives/freesurfer/"$subject"/surf/"$subject"."$hemisphere".midthickness.32k_fs_LR.surf.gii      
+                    echo "Done!"
+               else
+                    wb_command -metric-resample "$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/"$data_folder"/"$subject"/"$hemisphere"."$metric".gii \
+                        "$dataDir"/"$projectDir"/derivatives/freesurfer/"$subject"/surf/"$hemisphere".sphere.reg.surf.gii /home/ribeiro/Projects/deepRetinotopy_validation/templates/fs_LR-deformed_to-fsaverage."$hemi".sphere.32k_fs_LR.surf.gii \
+                        ADAP_BARY_AREA "$dataDir"/"$projectDir"/derivatives/freesurfer/"$subject"/surf/"$subject".fs_empirical_"$metric_new"_"$hemisphere".func.gii \
+                        -area-surfs "$dataDir"/"$projectDir"/derivatives/freesurfer/"$subject"/surf/"$hemisphere".midthickness.surf.gii "$dataDir"/"$projectDir"/derivatives/freesurfer/"$subject"/surf/"$subject"."$hemisphere".midthickness.32k_fs_LR.surf.gii      
+                fi
+            done
+        done
+    done
+done
+
+# Run deepRetinotopy
+echo "--------------------------------------------------------------------------------"
+echo "[Step 3] Run deepRetinotopy..."
+echo "--------------------------------------------------------------------------------"
+deepRetinotopy -s "$dataDir"/"$projectDir"/derivatives/freesurfer -t ~/Projects/deepRetinotopy_validation/templates/ -d lnyu -m "polarAngle,eccentricity,pRFsize"  -g 'yes'
