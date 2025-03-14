@@ -749,31 +749,34 @@ def variance_explained(stim_time, x, y, stim_img, fmri_data, tr, y_coord, x_coor
         Y0 = y_coord[i]
         sigma = pRFsize[i]
         mean = [X0, Y0]
-        covariance = [[sigma, 0], [0, sigma]] 
+        if sigma !=0:
+            # Generate covariance matrix
+            covariance = [[sigma, 0], [0, sigma]] 
 
-        # Generate 2D Gaussian
-        rv = multivariate_normal(mean, covariance)
-        gaussian_2d = rv.pdf(pos)
+            # Generate 2D Gaussian
+            rv = multivariate_normal(mean, covariance)
+            gaussian_2d = rv.pdf(pos)
 
-        # Determine the overlap between the stimulus and the pRF and calculate the spatial summation
-        overlap = stim_img * gaussian_2d[:,:,np.newaxis]
-        overlap = np.sum(overlap, axis=(0,1))
+            # Determine the overlap between the stimulus and the pRF and calculate the spatial summation
+            overlap = stim_img * gaussian_2d[:,:,np.newaxis]
+            overlap = np.sum(overlap, axis=(0,1))
 
-        # Convolve the timeseries from the previous step with the HRF
-        predicted_signal = np.convolve(overlap, new_hrf[0])[0:len(overlap)]
+            # Convolve the timeseries from the previous step with the HRF
+            predicted_signal = np.convolve(overlap, new_hrf[0])[0:len(overlap)]
 
-        # Interpolate the predicted signal to match the fmri data
-        bold_func_pred = scipy.interpolate.interp1d(np.linspace(0, t_max, len(predicted_signal)), predicted_signal)
-        predicted_signal = bold_func_pred(np.linspace(0, t_max, int(t_max/tr)))
+            # Interpolate the predicted signal to match the fmri data
+            bold_func_pred = scipy.interpolate.interp1d(np.linspace(0, t_max, len(predicted_signal)), predicted_signal)
+            predicted_signal = bold_func_pred(np.linspace(0, t_max, int(t_max/tr)))
 
-        # Calculate variance explained
-        if np.std(predicted_signal) == 0:
-            corr = 0
+            # Calculate variance explained
+            if np.std(predicted_signal) == 0:
+                corr = 0
+            else:
+                norm_predicted_signal = (predicted_signal - np.mean(predicted_signal)) / np.std(predicted_signal)
+                norm_fmri_data = (fmri_data[i] - np.mean(fmri_data[i])) / np.std(fmri_data[i])
+                corr = np.corrcoef(norm_predicted_signal, norm_fmri_data)[0,1]
         else:
-            norm_predicted_signal = (predicted_signal - np.mean(predicted_signal)) / np.std(predicted_signal)
-            norm_fmri_data = (fmri_data[i] - np.mean(fmri_data[i])) / np.std(fmri_data[i])
-            corr = np.corrcoef(norm_predicted_signal, norm_fmri_data)[0,1]
-            
+            corr = 0    
         variance_explained_.append(corr**2)
 
     return np.array(variance_explained_)
