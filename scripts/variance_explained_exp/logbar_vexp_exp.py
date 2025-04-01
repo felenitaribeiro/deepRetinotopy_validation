@@ -93,14 +93,14 @@ def data_load(data_directory, sub_id, num_of_runs, num_of_sessions, experiment =
     fmri_data = np.concatenate(fmri_data, axis=1)
 
     # Load empirical data    
-    polar_angle_empirical = nib.load(data_directory + 'derivatives/prf-estimation/' + sub_id + '/' + 
-                        sub_id + '_ses-concat_task-' + experiment + '_run-concat_hemi-l_grid_pol_transformed.gii').agg_data()
-    eccentricity_empirical = nib.load(data_directory + 'derivatives/prf-estimation/' + sub_id + '/prfpy/' + 
-                        sub_id + '_ses-concat_task-' + experiment + '_run-concat_hemi-l_grid_ecc.gii').agg_data()
-    vexpl_empirical = nib.load(data_directory + 'derivatives/prf-estimation/' + sub_id + '/prfpy/' + 
-                        sub_id + '_ses-concat_task-' + experiment + '_run-concat_hemi-l_grid_rsq.gii').agg_data()
-    pRFsize_empirical = nib.load(data_directory + 'derivatives/prf-estimation/' + sub_id + '/prfpy/' + 
-                        sub_id + '_ses-concat_task-' + experiment + '_run-concat_hemi-l_grid_size_1.gii').agg_data()
+    polar_angle_empirical = nib.load(data_directory + 'derivatives/prf-estimation/' + sub_id + '/' + '/braincoder/' +
+                        sub_id + '_ses-concat_task-' + experiment + '_run-concat_hemi-l_iter_pol.gii').agg_data()
+    eccentricity_empirical = nib.load(data_directory + 'derivatives/prf-estimation/' + sub_id + '/braincoder/' + 
+                        sub_id + '_ses-concat_task-' + experiment + '_run-concat_hemi-l_iter_ecc.gii').agg_data()
+    vexpl_empirical = nib.load(data_directory + 'derivatives/prf-estimation/' + sub_id + '/braincoder/' + 
+                        sub_id + '_ses-concat_task-' + experiment + '_run-concat_hemi-l_iter_r2.gii').agg_data()
+    pRFsize_empirical = nib.load(data_directory + 'derivatives/prf-estimation/' + sub_id + '/braincoder/' + 
+                        sub_id + '_ses-concat_task-' + experiment + '_run-concat_hemi-l_iter_sd.gii').agg_data()
     
     
     # Load predicted data
@@ -115,10 +115,6 @@ def data_load(data_directory, sub_id, num_of_runs, num_of_sessions, experiment =
     # Create mask 
     mask = pRFsize > 0 # mask based on ROI from predicted maps
     mask = mask * 1
-    # np.random.seed(42)
-    # indices = np.random.choice(np.where(mask != 0)[0], int(1. * np.sum(mask != 0)), replace=False) # randomly select 50% of the ROI
-    # mask_2 = np.zeros(np.shape(mask))
-    # mask_2[indices.astype(int)] = 1
     mask_final = mask
 
     # Apply mask
@@ -171,7 +167,7 @@ if __name__ == '__main__':
                         default='/BULK/LABDATA/openneuro/ds004698/')
     parser.add_argument('--sub_id', type=str, help='Subject ID', default='sub-01')
     parser.add_argument('--num_of_runs', type=int, help='Number of runs', default=3)
-    parser.add_argument('--num_of_sessions', type=int, help='Number of sessions', default=1)
+    parser.add_argument('--num_of_sessions', type=int, help='Number of sessions', default=2)
     parser.add_argument('--experiment', type=str, help='Experiment type (logbar or fixedbar)')
     parser.add_argument('--tr', type=float, help='Repetition time', default=1.2)
     args = parser.parse_args()
