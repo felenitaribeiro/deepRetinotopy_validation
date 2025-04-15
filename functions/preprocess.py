@@ -49,3 +49,24 @@ def transform_angle(path_to_empirical_data, hemisphere):
 
     nib.save(template, path_to_save)
     return 'Transformed data saved as ' + path_to_save
+
+def transform_angle_lh_nsd(path_to_empirical_data):
+    """
+    Transform angles of the left hemisphere to avoid discontinuity.
+    """
+    path_to_empirical_data = str(path_to_empirical_data)
+    path_to_save = path_to_empirical_data[:-4] + '_transformed.gii'
+    
+    # Load the empirical data
+    template = nib.load(path_to_empirical_data)
+    data = template.agg_data()
+
+    # Rescaling polar angle values
+    sum_180 = data < 180
+    minus_180 = data > 180
+    data[sum_180] = data[sum_180] + 180
+    data[minus_180] = data[minus_180] - 180
+    template.agg_data()[:] = data
+
+    nib.save(template, path_to_save)
+    return 'Transformed data saved as ' + path_to_save

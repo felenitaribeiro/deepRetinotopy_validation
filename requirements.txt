@@ -13,7 +13,7 @@ lxml==4.9.2
 matplotlib==3.7.1
 mne @ git+https://github.com/mne-tools/mne-python.git@18b80903da84483325584d8dffe7c9f847f12b81
 nibabel==5.1.0
-nilearn @ git+https://github.com/felenitaribeiro/nilearn.git@4198171e19336d827c03744d1ff73fb1612f14b9
+nilearn @ git+https://github.com/felenitaribeiro/nilearn.git@d3a678b13405a68b31d786e44ed2a218373636e0
 numpy==1.24.3
 pandas==2.0.1
 Pillow==9.5.0

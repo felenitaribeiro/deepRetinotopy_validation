@@ -378,6 +378,12 @@ def return_list_of_subs(dataset_name, pool_of_participants = 'all'):
         elif dataset_name == 'nyu':
             path = '/BULK/LABDATA/openneuro/ds003787/derivatives/freesurfer/'
             list_of_subs = os.listdir(path)
+        elif dataset_name == 'nsd':
+            path = '/BULK/LABDATA/NSD/freesurfer/'
+            list_of_subs = os.listdir(path)
+        elif dataset_name == 'HCP':
+            path = '/home/ribeiro/Projects/deepRetinotopy_validation/HCP/freesurfer/'
+            list_of_subs = os.listdir(path)
         elif dataset_name == 'stanford':
             if pool_of_participants == 'all':
                 path = '/BULK/LABDATA/openneuro/stanford-data/ds004440/derivatives/freesurfer/'
@@ -389,7 +395,8 @@ def return_list_of_subs(dataset_name, pool_of_participants = 'all'):
         
     return list_of_subs
 
-def predicted_vs_empirical(path, dataset_name, retinotopic_maps, hemispheres, threshold = None, experiment = None, region_of_interest = 'all', pool_of_participants = 'all'):
+def predicted_vs_empirical(path, dataset_name, retinotopic_maps, hemispheres, threshold = None, experiment = None, 
+                           region_of_interest = 'all', pool_of_participants = 'all', plot_type = 'hexbin'):
     """Calculate the error between predicted and empirical maps for different models.
     
     Args:
@@ -519,16 +526,21 @@ def predicted_vs_empirical(path, dataset_name, retinotopic_maps, hemispheres, th
         
         if threshold != None:
             print('Threshold: ' + str(threshold))
-        data = {'predicted_map': predicted_map, 'empirical_map': empirical_map}
+        data = {'DeepRetinotopy': predicted_map, 'Localizer based': empirical_map}
         data = pd.DataFrame(data)
         fig = plt.figure()
-        sns.kdeplot(x = data['predicted_map'], y = data['empirical_map'],cmap="Blues", fill=True,cbar=True)
+        if plot_type == 'kde':
+            sns.kdeplot(x = data['DeepRetinotopy'], y = data['Localizer based'],cmap="Blues", fill=True,cbar=True)
+        else:
+            sns.jointplot(x =data['DeepRetinotopy'], y = data['Localizer based'], color='blue', kind='hex')
         if retinotopic_map == 'polarAngle':
-            corr = circcorrcoef(np.array(data['predicted_map'])*u.deg, np.array(data['empirical_map'])*u.deg)
+            corr = circcorrcoef(np.array(data['DeepRetinotopy'])*u.deg, np.array(data['Localizer based'])*u.deg)
             print(corr)
         else:
-            corr = scipy.stats.pearsonr(data['predicted_map'], data['empirical_map'])
+            corr = scipy.stats.pearsonr(data['DeepRetinotopy'], data['Localizer based'])
             print(corr)
+        plt.xlabel('DeepRetinotopy', fontsize=20)
+        plt.ylabel('Localizer based', fontsize=20)
 
         if retinotopic_map ==  'polarAngle':
             plt.plot([0, 360], [0, 360], 'k--')
@@ -572,19 +584,19 @@ def predicted_vs_empirical(path, dataset_name, retinotopic_maps, hemispheres, th
 
         if len(hemispheres) > 1:
             if threshold != None:
-                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_' + experiment_name + 'both_' + str(threshold) + '_' + region_of_interest + pool_of_participants_name + '.png')
-                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_'+ experiment_name + 'both_' + str(threshold) + '_' + region_of_interest + pool_of_participants_name + '.pdf')
+                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_' + experiment_name + 'both_' + str(threshold) + '_' + region_of_interest + pool_of_participants_name + '_' + plot_type + '.png')
+                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_'+ experiment_name + 'both_' + str(threshold) + '_' + region_of_interest + pool_of_participants_name + '_' + plot_type +  '.pdf')
             else:
-                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_' + experiment_name + 'both' + '_' + region_of_interest + pool_of_participants_name + '.png')
-                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_' + experiment_name + 'both' + '_' + region_of_interest + pool_of_participants_name + '.pdf')       
+                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_' + experiment_name + 'both' + '_' + region_of_interest + pool_of_participants_name + '_' + plot_type + '.png')
+                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_' + experiment_name + 'both' + '_' + region_of_interest + pool_of_participants_name + '_' + plot_type +  '.pdf')       
         else:
 
             if threshold != None:
-                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_' + experiment_name + hemispheres[0] + '_' + str(threshold) + '_' + region_of_interest + pool_of_participants_name + '.png')
-                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_' + experiment_name + hemispheres[0] + '_' + str(threshold) + '_' + region_of_interest + pool_of_participants_name + '.pdf')
+                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_' + experiment_name + hemispheres[0] + '_' + str(threshold) + '_' + region_of_interest + pool_of_participants_name + '_' + plot_type + '.png')
+                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_' + experiment_name + hemispheres[0] + '_' + str(threshold) + '_' + region_of_interest + pool_of_participants_name + '_' + plot_type +  '.pdf')
             else:
-                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_' + experiment_name + hemispheres[0] + '_' + region_of_interest + pool_of_participants_name + '.png')
-                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_' + experiment_name + hemispheres[0] + '_' + region_of_interest + pool_of_participants_name + '.pdf')
+                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_' + experiment_name + hemispheres[0] + '_' + region_of_interest + pool_of_participants_name + '_' + plot_type + '.png')
+                plt.savefig('../output/model_evaluation/' + dataset_name + '/PredictedVsEmpirical_' + retinotopic_map + '_' + experiment_name + hemispheres[0] + '_' + region_of_interest + pool_of_participants_name + '_' + plot_type +  '.pdf')
         plt.show()
     return
 
