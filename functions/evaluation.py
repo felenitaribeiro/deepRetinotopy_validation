@@ -524,23 +524,33 @@ def predicted_vs_empirical(path, dataset_name, retinotopic_maps, hemispheres, th
             predicted_map = predicted_map + list(np.array(predicted_map_hemi).flatten())
             empirical_map = empirical_map + list(np.array(empirical_map_hemi).flatten())
         
+        if retinotopic_map == 'eccentricity': # to remove outliers seen in the stanford dataset - TODO
+            predicted_map = np.array(predicted_map)
+            predicted_map[predicted_map > 10] = 10
+            predicted_map[predicted_map < 0] = 0
+            predicted_map = list(predicted_map)
+        else:
+            predicted_map = np.array(predicted_map)
+            predicted_map[predicted_map < 0] = 0
+            predicted_map = list(predicted_map)
+
         if threshold != None:
             print('Threshold: ' + str(threshold))
-        data = {'DeepRetinotopy': predicted_map, 'Localizer based': empirical_map}
+        data = {'DeepRetinotopy': predicted_map, 'Empirical': empirical_map}
         data = pd.DataFrame(data)
-        fig = plt.figure()
+        fig = plt.figure(figsize=(10, 10))
         if plot_type == 'kde':
-            sns.kdeplot(x = data['DeepRetinotopy'], y = data['Localizer based'],cmap="Blues", fill=True,cbar=True)
+            sns.kdeplot(x = data['DeepRetinotopy'], y = data['Empirical'],cmap="Blues", fill=True,cbar=True)
         else:
-            sns.jointplot(x =data['DeepRetinotopy'], y = data['Localizer based'], color='blue', kind='hex')
+            sns.jointplot(x =data['DeepRetinotopy'], y = data['Empirical'], color='blue', kind='hex')
         if retinotopic_map == 'polarAngle':
-            corr = circcorrcoef(np.array(data['DeepRetinotopy'])*u.deg, np.array(data['Localizer based'])*u.deg)
+            corr = circcorrcoef(np.array(data['DeepRetinotopy'])*u.deg, np.array(data['Empirical'])*u.deg)
             print(corr)
         else:
-            corr = scipy.stats.pearsonr(data['DeepRetinotopy'], data['Localizer based'])
+            corr = scipy.stats.pearsonr(data['DeepRetinotopy'], data['Empirical'])
             print(corr)
-        plt.xlabel('DeepRetinotopy', fontsize=20)
-        plt.ylabel('Localizer based', fontsize=20)
+        plt.xlabel('DeepRetinotopy ($^\circ$)', fontsize=17)
+        plt.ylabel('Empirical ($^\circ$)', fontsize=17)
 
         if retinotopic_map ==  'polarAngle':
             plt.plot([0, 360], [0, 360], 'k--')
