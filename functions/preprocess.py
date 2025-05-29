@@ -11,7 +11,10 @@ def polarcoord(x_data, y_data):
     ys = nib.load(y_data).agg_data()
 
     # Transform to polar coordinates
-    theta = np.arctan2(ys,xs)
+    theta = np.arctan2(ys,xs) * 180 / np.pi 
+    sum = theta < 0 # shift values to be between 0 and 360
+    theta[sum] = theta[sum] + 360
+
     r = np.sqrt(xs**2 + ys**2)
     print(theta.max(), theta.min())
     # Save data
@@ -70,3 +73,42 @@ def transform_angle_lh_nsd(path_to_empirical_data):
 
     nib.save(template, path_to_save)
     return 'Transformed data saved as ' + path_to_save
+
+def transform_polarangle_neuropythy(path, hemisphere = 'lh'): 
+    """
+    Transform the polar angle maps from -180 to 180 degrees where the origin in the positive y-axis, to 0 to 360 degrees where
+    the origin is the positive x-axis.
+    
+    Parameters
+    ----------
+    path : str
+        The path to polar angle map file.
+        
+    Returns
+    -------
+    numpy.ndarray
+        The transformed polar angle in degrees.
+    """
+
+    data = nib.load(path)
+    angle = data.agg_data()
+    if hemisphere == 'lh':
+        angle = - angle
+    mask = angle == 0
+    # Step 1: Rotate by 90 degrees using a rotation matrix
+    angle = angle / 180 * np.pi
+    x = np.cos(angle)
+    y = np.sin(angle)
+    rotation_matrix = np.array([[0, -1], [1, 0]])
+    rotated_coords = rotation_matrix @ np.array([x, y])
+    rotated_angle = np.degrees(np.arctan2(rotated_coords[1], rotated_coords[0]))
+
+    # Step 2: Shift values to be between 0 and 360
+    rotated_angle[rotated_angle <= 0] = np.abs(rotated_angle[rotated_angle <= 0] + 360)
+    rotated_angle[mask] = 0
+    data.agg_data()[:] = rotated_angle
+    file_name = path[:-4] + '_transformed.gii'
+
+    nib.save(data, file_name)
+
+    return print('Polar angle map has been transformed and saved as ' + file_name)
