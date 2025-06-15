@@ -20,6 +20,23 @@ from scipy.stats import multivariate_normal
 from astropy.stats import circcorrcoef
 from astropy import units as u
 
+def transform_polarangle(data):
+        """Transform polar angle values from the left hemisphere to the range from 0-90 degrees 
+        (UVF) and from 360-270 degrees (LVF).
+
+        Args:
+            data (numpy array): Polar angle values
+
+        Returns:
+            data (numpy array): Transformed polar angle values
+        """
+        mask = data < 0
+        subtract = data > 180
+        add = data < 180
+        data[subtract] = data[subtract] - 180
+        data[add] = data[add] + 180
+        data[mask] = -1
+        return data
 
 def roi_earlyvisualcortex(list_of_labels):
     """Mask for the selection of the region of interest in the surface
@@ -195,9 +212,10 @@ def process_subjects(list_of_sub_ids, path, dataset_name, hemisphere, mask_final
     empirical_map_hemi = []
     for sub_id in list_of_sub_ids:
         if dataset_name == 'logbar':
-            data = RetinotopyData_logbar(path, sub_id, hemisphere, mask_final, retinotopic_map, experiment=experiment)
+            print(retinotopic_map)
+            data = RetinotopyData_logbar(path, sub_id, hemisphere, retinotopic_map, experiment=experiment)
         else:
-            data = RetinotopyData(path, sub_id, hemisphere, mask_final, retinotopic_map)
+            data = RetinotopyData(path, sub_id, hemisphere, retinotopic_map)
         data.apply_mask_to_maps(mask_final)
         apply_threshold(data, threshold)
         if retinotopic_map == 'polarAngle' and hemisphere == 'lh':
@@ -265,7 +283,7 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
                 # Error
                 if i == j:
                     # Loading maps
-                    data = RetinotopyData(path, dev_set[i], hemisphere, ROI_masked, retinotopic_map, model_index=str(model + 1))
+                    data = RetinotopyData(path, dev_set[i], hemisphere, retinotopic_map, model_index=str(model + 1))
                     data.apply_mask_to_maps(ROI_masked)
                     data.apply_mask_to_maps(mask)
 
@@ -301,11 +319,11 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
                 # Inter-individual variability in predicted maps
                 if i != j:
                     # Loading maps
-                    data_1 = RetinotopyData(path, dev_set[i], hemisphere, ROI_masked, retinotopic_map, model_index=str(model + 1))
+                    data_1 = RetinotopyData(path, dev_set[i], hemisphere, retinotopic_map, model_index=str(model + 1))
                     data_1.apply_mask_to_maps(ROI_masked)
                     data_1.apply_mask_to_maps(mask)
 
-                    data_2 = RetinotopyData(path, dev_set[j], hemisphere, ROI_masked, retinotopic_map, model_index=str(model + 1))
+                    data_2 = RetinotopyData(path, dev_set[j], hemisphere, retinotopic_map, model_index=str(model + 1))
                     data_2.apply_mask_to_maps(ROI_masked)
                     data_2.apply_mask_to_maps(mask)
                     
@@ -537,10 +555,11 @@ def predicted_vs_empirical(path, dataset_name, retinotopic_maps, hemispheres,
             hemisphere_name = hemispheres[0]
         threshold_str = f'_{threshold}' if threshold is not None else ''
         file_suffix = f'{hemisphere_name}{threshold_str}_{region_of_interest}{pool_of_participants_name}_{plot_type}'
-        fig.savefig(f'{base_path}_{file_suffix}.png')
-        fig.savefig(f'{base_path}_{file_suffix}.pdf')
+        plt.savefig(f'{base_path}_{file_suffix}.png')
+        plt.savefig(f'{base_path}_{file_suffix}.pdf')
         print(f'Saving plot to {base_path}_{file_suffix}.png and {base_path}_{file_suffix}.pdf')
         plt.show()
+        # plt.show()
     return
 
 def explainedvariance_vs_error(path, retinotopic_map, hemisphere, threshold = 10):
@@ -593,7 +612,7 @@ def explainedvariance_vs_error(path, retinotopic_map, hemisphere, threshold = 10
                 # Error
                 if i == j:
                     # Loading maps
-                    data = RetinotopyData(path, dev_set[i], hemisphere, ROI_masked, retinotopic_map, model_index=model + 1)
+                    data = RetinotopyData(path, dev_set[i], hemisphere, retinotopic_map, model_index=model + 1)
                     data.apply_mask_to_maps(ROI_masked)
                     data.apply_mask_to_maps(mask)
                     
