@@ -10,7 +10,7 @@ from functions.visualization import roi, roi_earlyvisualcortex
 
 class RetinotopyData:
     def __init__(self, path, subject_id, hemisphere, 
-                 retinotopic_map, number_hemi_nodes=int(32492), model = 'deepRetinotopy25', model_index=None):
+                 retinotopic_map, number_hemi_nodes=int(32492), model = 'deepRetinotopy25', model_index=None, split_half=None):
         self.path = path
         self.subject_id = subject_id
         self.hemisphere = hemisphere
@@ -18,12 +18,17 @@ class RetinotopyData:
         self.number_hemi_nodes = number_hemi_nodes
         self.model = model  # model type, e.g., 'deepRetinotopy' or 'benson14'
         self.model_index = model_index  # optional model index for specific seeds from deepRetinotopy
+        self.split_half = split_half  # optional parameter for split-half analysis
 
         # Load maps during initialization
         self.predicted_map = self._load_map("predicted")
         self.empirical_map = self._load_map("empirical")
         self.variance_explained = self._load_map("variance_explained")
         self.curvature = self._load_map("curvature")
+
+        if self.split_half is not None:
+            self.empirical_map_split2 = self._load_map("empirical_split2")
+            self.empirical_map_split3 = self._load_map("empirical_split3")
 
     def _load_map(self, map_type):
         """Load a retinotopic map (predicted or empirical)."""
@@ -37,12 +42,18 @@ class RetinotopyData:
                 file_name = f"predicted_deepRetinotopy_21/{self.subject_id}.fs_predicted_{self.retinotopic_map}_{self.hemisphere}_curvatureMyelinFeat_model.func.gii"
             elif self.model == 'benson14':
                 file_name = f"surf/{self.hemisphere}.benson14_{self.retinotopic_map}.gii"
+            elif self.model == 'noise_ceiling':
+                file_name = f"deepRetinotopy/{self.subject_id}.fs_predicted_{self.retinotopic_map}_{self.hemisphere}_curvatureFeat_model.func.gii" # This won't be used
         elif map_type == 'empirical':
             file_name = f"surf/{self.subject_id}.fs_empirical_{self.retinotopic_map}_{self.hemisphere}.func.gii"
         elif map_type == 'variance_explained':
             file_name = f"surf/{self.subject_id}.fs_empirical_variance_explained_{self.hemisphere}.func.gii"
         elif map_type == 'curvature':
             file_name = f"surf/{self.subject_id}.curvature-midthickness.{self.hemisphere}.32k_fs_LR.func.gii"
+        elif map_type == 'empirical_split2':
+            file_name = f"surf/{self.subject_id}.fs_empirical_{self.retinotopic_map}_{self.hemisphere}_fit2.func.gii"
+        elif map_type == 'empirical_split3':
+            file_name = f"surf/{self.subject_id}.fs_empirical_{self.retinotopic_map}_{self.hemisphere}_fit3.func.gii"
         else:
             raise ValueError("Invalid map type specified.")
 
@@ -88,12 +99,18 @@ class RetinotopyData:
         self.predicted_map = self._apply_mask(self.predicted_map)
         self.empirical_map = self._apply_mask(self.empirical_map)
         self.variance_explained = self._apply_mask(self.variance_explained)
+        if self.split_half is not None:
+            self.empirical_map_split2 = self._apply_mask(self.empirical_map_split2)
+            self.empirical_map_split3 = self._apply_mask(self.empirical_map_split3)
     
     def apply_transform_polarangle(self):
         """Transform the polar angle values in the empirical and predicted maps."""
         if self.retinotopic_map == 'polarAngle':
             self.empirical_map = self._transform_polarangle(self.empirical_map)
             self.predicted_map = self._transform_polarangle(self.predicted_map)
+            if self.split_half is not None:
+                self.empirical_map_split2 = self._transform_polarangle(self.empirical_map_split2)
+                self.empirical_map_split3 = self._transform_polarangle(self.empirical_map_split3)
         else:
             raise ValueError("Polar angle transformation is only applicable to this map.")
     
@@ -102,6 +119,9 @@ class RetinotopyData:
         if self.retinotopic_map == 'polarAngle' or self.retinotopic_map == 'eccentricity':
             self.empirical_map = self._convert_to_radian(self.empirical_map)
             self.predicted_map = self._convert_to_radian(self.predicted_map)
+            if self.split_half is not None:
+                self.empirical_map_split2 = self._convert_to_radian(self.empirical_map_split2)
+                self.empirical_map_split3 = self._convert_to_radian(self.empirical_map_split3)
         else:
             raise ValueError("Conversion to radians is only applicable to polar angle and eccentricity maps.")
     
@@ -135,7 +155,7 @@ class RetinotopyData:
         elif self.retinotopic_map == 'pRFsize':
             self.predicted_map = self.predicted_map + threshold
             self.empirical_map = self.empirical_map + threshold
-            max_value = 5 + threshold
+            max_value = 2 + threshold
 
         # Apply mask
         if region_of_interest == 'visualcortex':
@@ -190,12 +210,12 @@ class RetinotopyData:
         return view
 
 class RetinotopyData_logbar(RetinotopyData):
-    def __init__(self, path, subject_id, hemisphere, ROI_masked, retinotopic_map, 
+    def __init__(self, path, subject_id, hemisphere, retinotopic_map, 
                  number_hemi_nodes=int(32492), experiment=None):
         # Use the experiment parameter to differentiate logbar data
         self.experiment = experiment
         # Initialize the parent class with the provided parameters
-        super().__init__(path, subject_id, hemisphere, ROI_masked, 
+        super().__init__(path, subject_id, hemisphere, 
                          retinotopic_map, number_hemi_nodes)
         # Load maps during initialization
         self.predicted_map = self._load_map("predicted")
