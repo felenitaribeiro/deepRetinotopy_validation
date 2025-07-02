@@ -5,7 +5,9 @@ export APPTAINER_BINDPATH=/scratch,/QRISdata
 ml connectomeworkbench/1.5.0
 
 
-dataDir=../samsrf_all/
+dataDir=/home/ribeiro/Projects/deepRetinotopy_validation/tmp/samsrf_all/
+freesurferDir=/home/ribeiro/Projects/deepRetinotopy_validation/HCP/freesurfer
+templatesDir=/home/ribeiro/Projects/deepRetinotopy_validation/templates
 
 # Data processing
 echo "--------------------------------------------------------------------------------"
@@ -39,31 +41,30 @@ do
                 if [ $hemisphere == 'lh' ]; then
                     echo "Resampling $metric data..."
                     wb_command -metric-resample "$dataDir"/$subject/"$hemisphere"_"$subject"_"$metric".gii \
-                        /scratch/project/recyle_dl/deepRetinotopy_TheToolbox/HCP/freesurfer/$subject/surf/"$hemisphere".sphere.reg.surf.gii /scratch/project/recyle_dl/deepRetinotopy_TheToolbox/templates/fs_LR-deformed_to-fsaverage."$hemi".sphere.32k_fs_LR.surf.gii \
-                        ADAP_BARY_AREA "$dataDir"/$subject/"$subject".fs_empirical_samsrf_"$metric_new"_"$hemisphere".func.gii \
-                        -area-surfs /scratch/project/recyle_dl/deepRetinotopy_TheToolbox/HCP/freesurfer/$subject/surf/"$hemisphere".midthickness.surf.gii /scratch/project/recyle_dl/deepRetinotopy_TheToolbox/HCP/freesurfer/$subject/surf/"$subject"."$hemisphere".midthickness.32k_fs_LR.surf.gii   
-                    python -c "import sys; sys.path.append('/scratch/project/recyle_dl/deepRetinotopy_validation'); \
+                        "$freesurferDir"/$subject/surf/"$hemisphere".sphere.reg.surf.gii "$templatesDir"/fs_LR-deformed_to-fsaverage."$hemi".sphere.32k_fs_LR.surf.gii \
+                        BARYCENTRIC "$dataDir"/$subject/"$subject".fs_empirical_samsrf_"$metric_new"_"$hemisphere".func.gii
+                    # Transforming polar angle maps after resampling as the left hemisphere data ranges from 90 to -90 degrees avoiding the 180 degrees discontinuity
+                    python -c "import sys; sys.path.append('/home/ribeiro/Projects/deepRetinotopy_validation/'); \
                             from functions.preprocess import transform_angle; \
                             transform_angle('"$dataDir"/$subject/"$subject".fs_empirical_samsrf_"$metric_new"_"$hemisphere".func.gii', '$hemisphere', left_hemi_shift=False)"
                                     echo "Resampling $metric data..." 
                     mv "$dataDir"/$subject/"$subject".fs_empirical_samsrf_"$metric_new"_"$hemisphere".func_transformed.gii "$dataDir"/$subject/"$subject".fs_empirical_samsrf_"$metric_new"_"$hemisphere".func.gii 
                 else
-                    python -c "import sys; sys.path.append('/scratch/project/recyle_dl/deepRetinotopy_validation'); \
+                    # Transforming polar angle maps before resampling as the right hemisphere data ranges from -180 to -90 and 180 to 90 degrees with a 180 degrees discontinuity
+                    python -c "import sys; sys.path.append('/home/ribeiro/Projects/deepRetinotopy_validation/'); \
                         from functions.preprocess import transform_angle; \
                         transform_angle('"$dataDir"/"$subject"/"$hemisphere"_"$subject"_"$metric".gii', '$hemisphere', left_hemi_shift=False)"
                                 echo "Resampling $metric data..."
                     echo "Resampling $metric data..."
                     wb_command -metric-resample "$dataDir"/$subject/"$hemisphere"_"$subject"_"$metric"_transformed.gii \
-                        /scratch/project/recyle_dl/deepRetinotopy_TheToolbox/HCP/freesurfer/$subject/surf/"$hemisphere".sphere.reg.surf.gii /scratch/project/recyle_dl/deepRetinotopy_TheToolbox/templates/fs_LR-deformed_to-fsaverage."$hemi".sphere.32k_fs_LR.surf.gii \
-                        ADAP_BARY_AREA "$dataDir"/$subject/"$subject".fs_empirical_samsrf_"$metric_new"_"$hemisphere".func.gii \
-                        -area-surfs /scratch/project/recyle_dl/deepRetinotopy_TheToolbox/HCP/freesurfer/$subject/surf/"$hemisphere".midthickness.surf.gii /scratch/project/recyle_dl/deepRetinotopy_TheToolbox/HCP/freesurfer/$subject/surf/"$subject"."$hemisphere".midthickness.32k_fs_LR.surf.gii   
+                        "$freesurferDir"/$subject/surf/"$hemisphere".sphere.reg.surf.gii "$templatesDir"/fs_LR-deformed_to-fsaverage."$hemi".sphere.32k_fs_LR.surf.gii \
+                        BARYCENTRIC "$dataDir"/$subject/"$subject".fs_empirical_samsrf_"$metric_new"_"$hemisphere".func.gii
                 fi
             else
                 echo "Resampling $metric data..."
                 wb_command -metric-resample "$dataDir"/$subject/"$hemisphere"_"$subject"_"$metric".gii \
-                    /scratch/project/recyle_dl/deepRetinotopy_TheToolbox/HCP/freesurfer/$subject/surf/"$hemisphere".sphere.reg.surf.gii /scratch/project/recyle_dl/deepRetinotopy_TheToolbox/templates/fs_LR-deformed_to-fsaverage."$hemi".sphere.32k_fs_LR.surf.gii \
-                    ADAP_BARY_AREA "$dataDir"/$subject/"$subject".fs_empirical_samsrf_"$metric_new"_"$hemisphere".func.gii \
-                    -area-surfs /scratch/project/recyle_dl/deepRetinotopy_TheToolbox/HCP/freesurfer/$subject/surf/"$hemisphere".midthickness.surf.gii /scratch/project/recyle_dl/deepRetinotopy_TheToolbox/HCP/freesurfer/$subject/surf/"$subject"."$hemisphere".midthickness.32k_fs_LR.surf.gii   
+                    "$freesurferDir"/$subject/surf/"$hemisphere".sphere.reg.surf.gii "$templatesDir"/fs_LR-deformed_to-fsaverage."$hemi".sphere.32k_fs_LR.surf.gii \
+                    BARYCENTRIC "$dataDir"/$subject/"$subject".fs_empirical_samsrf_"$metric_new"_"$hemisphere".func.gii
             fi
         done
     done
