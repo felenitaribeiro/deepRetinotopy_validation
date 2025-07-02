@@ -8,3 +8,6 @@
 /tmp/*
 /NYU_bar_model_predictions/*
 /.conda/*
+/.vscode/*
+/.pytest_cache/*
+/test/__pycache__/*
