@@ -108,7 +108,7 @@ def transform_polarangle_neuropythy(path, hemisphere = 'lh'):
     rotated_angle[rotated_angle <= 0] = np.abs(rotated_angle[rotated_angle <= 0] + 360)
     rotated_angle[mask] = 0
     data.agg_data()[:] = rotated_angle
-    file_name = path[:-4] + '_transformed.gii'
+    file_name = path[:-4] + '_neuropythy.gii'
 
     nib.save(data, file_name)
 
