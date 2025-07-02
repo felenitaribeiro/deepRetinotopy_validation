@@ -25,7 +25,7 @@ def polarcoord(x_data, y_data):
     return print('Data in cartesian coordinates transformed to polar coordinates')
 
 
-def transform_angle(path_to_empirical_data, hemisphere):
+def transform_angle(path_to_empirical_data, hemisphere, radians = False, left_hemi_shift = True):
     """
     Transform the polar angle maps from -180 to 180 degrees where the origin in the positive x-axis, to 0 to 360 degrees where
     the origin is the positive x-axis. The angles of the left hemisphere will be shifted by 180 degrees.
@@ -36,13 +36,14 @@ def transform_angle(path_to_empirical_data, hemisphere):
     # Load the empirical data
     template = nib.load(path_to_empirical_data)
     data = template.agg_data()
-    data = data * 180 / np.pi
+    if radians:
+        data = data * 180 / np.pi
 
     # shift values to be between 0 and 360
     sum = data < 0
     data[sum] = data[sum] + 360
 
-    if hemisphere == 'lh':
+    if hemisphere == 'lh' and left_hemi_shift:
         # Rescaling polar angle values
         sum_180 = data < 180
         minus_180 = data > 180
@@ -107,7 +108,7 @@ def transform_polarangle_neuropythy(path, hemisphere = 'lh'):
     rotated_angle[rotated_angle <= 0] = np.abs(rotated_angle[rotated_angle <= 0] + 360)
     rotated_angle[mask] = 0
     data.agg_data()[:] = rotated_angle
-    file_name = path[:-4] + '_transformed.gii'
+    file_name = path[:-4] + '_neuropythy.gii'
 
     nib.save(data, file_name)
 
