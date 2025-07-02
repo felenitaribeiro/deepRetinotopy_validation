@@ -5,5 +5,11 @@
 /functions/__pycache__/*
 /deepRetinotopy_TheToolbox/*
 /*.zip
+<<<<<<< HEAD
 /NYU_bar_model_predictions/*
 /tmp/*
+=======
+/tmp/*
+/NYU_bar_model_predictions/*
+/.conda/*
+>>>>>>> 8a84a98292012c1ca58689e414de9a001ac07104
