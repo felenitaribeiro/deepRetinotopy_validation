@@ -236,3 +236,43 @@ class RetinotopyData_logbar(RetinotopyData):
         file_path = osp.join(self.path, self.subject_id, file_name)
         data = np.array(nib.load(file_path).agg_data()).reshape(self.number_hemi_nodes, -1)
         return data
+
+class RetinotopyData_training(RetinotopyData):
+    def __init__(self, path, subject_id, hemisphere, ROI_masked, retinotopic_map, 
+                 number_hemi_nodes=int(32492), encoding_model='AnalyzePRF'):
+        self.path = path
+        self.subject_id = subject_id
+        self.hemisphere = hemisphere
+        self.retinotopic_map = retinotopic_map
+        self.number_hemi_nodes = number_hemi_nodes
+        self.encoding_model = encoding_model
+
+        # Load maps during initialization
+        self.empirical_map = self._load_map("empirical")
+        self.variance_explained = self._load_map("variance_explained")
+
+    def _load_map(self, map_type):
+        if map_type == 'empirical':
+            if self.encoding_model == 'AnalyzePRF':
+                file_name = f"surf/{self.subject_id}.fs_empirical_{self.retinotopic_map}_{self.hemisphere}.func.gii"
+            elif self.encoding_model == 'SamSrf':
+                file_name = f"samsrf/{self.subject_id}.fs_empirical_samsrf_{self.retinotopic_map}_{self.hemisphere}.func.gii"
+            else:
+                raise ValueError("Invalid encoding model specified.")
+        elif map_type == 'variance_explained':
+            if self.encoding_model == 'AnalyzePRF':
+                file_name = f"surf/{self.subject_id}.fs_empirical_variance_explained_{self.hemisphere}.func.gii"
+            elif self.encoding_model == 'SamSrf':
+                file_name = f"samsrf/{self.subject_id}.fs_empirical_samsrf_variance_explained_{self.hemisphere}.func.gii"
+            else:
+                raise ValueError("Invalid encoding model specified.")
+
+        file_path = osp.join(self.path, self.subject_id, file_name)
+        data = np.array(nib.load(file_path).agg_data()).reshape(self.number_hemi_nodes, -1)
+        return data
+    
+    def apply_mask_to_maps(self, mask):
+        """Apply the mask to the predicted, empirical, and variance explained maps."""
+        self.mask = mask
+        self.empirical_map = self._apply_mask(self.empirical_map)
+        self.variance_explained = self._apply_mask(self.variance_explained)
