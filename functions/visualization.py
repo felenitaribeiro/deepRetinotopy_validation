@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import warnings
 import sys
 sys.path.append('..')
-from functions.evaluation import discretize
+# from functions.evaluation import discretize
 from nilearn import plotting
 from matplotlib.colors import ListedColormap
 
@@ -261,6 +261,7 @@ def retinotopic_map_plot(subject_id, path, template_path, prediction = 'average'
     if hemisphere == 'lh':
         surface = osp.join(template_path,'fs_LR-deformed_to-fsaverage.L.sphere.32k_fs_LR.surf.gii')
         colour = 'gist_rainbow_r'
+        # colour = cc.cm.CET_C1
     else:
         surface = osp.join(template_path,'fs_LR-deformed_to-fsaverage.R.sphere.32k_fs_LR.surf.gii')
         if retinotopic_map == 'polarAngle':

@@ -29,7 +29,6 @@ do
                 hemi="R"
             fi
             # freesurfer data
-            datalad get $subject/surf/"$hemisphere".white
             datalad get $subject/surf/"$hemisphere".pial
             datalad get $subject/surf/"$hemisphere".sphere
             datalad get $subject/surf/"$hemisphere".sphere.reg

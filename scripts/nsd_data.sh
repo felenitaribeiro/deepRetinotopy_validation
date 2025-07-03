@@ -53,18 +53,18 @@ do
                     python -c "import sys; sys.path.append('/home/ribeiro/Projects/deepRetinotopy_validation/'); \
                             from functions.preprocess import transform_angle_lh_nsd; \
                             transform_angle_lh_nsd('"$dataDir"/freesurfer/"$subject"/label/"$hemisphere"."$metric".gii')"
-                                    echo "Resampling $metric data..."
+
                     echo "Resampling $metric data..."
                     wb_command -metric-resample "$dataDir"/freesurfer/$subject/label/"$hemisphere"."$metric"_transformed.gii \
                         $subject/surf/"$hemisphere".sphere.reg.surf.gii /home/ribeiro/Projects/deepRetinotopy_validation/templates/fs_LR-deformed_to-fsaverage."$hemi".sphere.32k_fs_LR.surf.gii \
-                        ADAP_BARY_AREA $subject/surf/"$subject".fs_empirical_"$metric_new"_"$hemisphere".func.gii \
+                        ADAP_BARY_AREA $subject/deepRetinotopy/"$subject".fs_empirical_"$metric_new"_"$hemisphere".func.gii \
                         -area-surfs $subject/surf/"$hemisphere".midthickness.surf.gii $subject/surf/"$subject"."$hemisphere".midthickness.32k_fs_LR.surf.gii   
                         
                 else
                     echo "Resampling $metric data..."
                     wb_command -metric-resample "$dataDir"/freesurfer/$subject/label/"$hemisphere"."$metric".gii \
                         $subject/surf/"$hemisphere".sphere.reg.surf.gii /home/ribeiro/Projects/deepRetinotopy_validation/templates/fs_LR-deformed_to-fsaverage."$hemi".sphere.32k_fs_LR.surf.gii \
-                        ADAP_BARY_AREA $subject/surf/"$subject".fs_empirical_"$metric_new"_"$hemisphere".func.gii \
+                        ADAP_BARY_AREA $subject/deepRetinotopy/"$subject".fs_empirical_"$metric_new"_"$hemisphere".func.gii \
                         -area-surfs $subject/surf/"$hemisphere".midthickness.surf.gii $subject/surf/"$subject"."$hemisphere".midthickness.32k_fs_LR.surf.gii   
                 fi
             done
