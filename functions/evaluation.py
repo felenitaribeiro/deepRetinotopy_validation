@@ -10,7 +10,6 @@ import scipy
 
 sys.path.append('..')
 
-from functions.datasets import *
 from deepRetinotopy_TheToolbox.utils.metrics import smallest_angle
 from deepRetinotopy_TheToolbox.utils.rois import ROI_WangParcelsPlusFovea as roi
 from deepRetinotopy_TheToolbox.utils.rois import ROIs_WangParcels as roi_parcel
@@ -208,11 +207,11 @@ def apply_threshold(data, threshold):
 
 def process_subjects(list_of_sub_ids, path, dataset_name, hemisphere, mask_final, retinotopic_map, experiment, threshold):
     """Process subjects and return predicted and empirical maps."""
+    from functions.datasets import RetinotopyData, RetinotopyData_logbar
     predicted_map_hemi = []
     empirical_map_hemi = []
     for sub_id in list_of_sub_ids:
         if dataset_name == 'logbar':
-            print(retinotopic_map)
             data = RetinotopyData_logbar(path, sub_id, hemisphere, retinotopic_map, experiment=experiment)
         else:
             data = RetinotopyData(path, sub_id, hemisphere, retinotopic_map)
@@ -258,6 +257,7 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
         plt (matplotlib.pyplot): Plot of the inter-individual variability in predicted maps and the error. 
             PNG file saved at the output folder.
     """
+    from functions.datasets import RetinotopyData
     mean_ind_variability = []
     error = []
 
@@ -298,16 +298,17 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
                     if retinotopic_map == 'polarAngle' or retinotopic_map == 'eccentricity':
                         data.convert_to_radian()
 
+                    # Threshold mask
+                    threshold_mask = data.variance_explained > threshold if threshold is not None else np.ones_like(data.variance_explained, dtype=bool)
+                    data.predicted_map = data.predicted_map[threshold_mask]
+                    data.empirical_map = data.empirical_map[threshold_mask]
+
                     # Calculating error
                     if retinotopic_mapping == 'continuous':
                         if retinotopic_map == 'polarAngle' or retinotopic_map == 'eccentricity':
                             theta = smallest_angle(data.predicted_map, data.empirical_map)
-                            if threshold != None:
-                                theta = theta[data.variance_explained > threshold]
                         elif retinotopic_map == 'pRFsize':
                             theta = np.abs(data.predicted_map - data.empirical_map)
-                            if threshold != None:
-                                theta = theta[data.variance_explained > threshold]
                         theta_withinsubj.append(np.mean(theta))
                     elif retinotopic_mapping == 'discrete':
                         if retinotopic_map == 'polarAngle' or retinotopic_map == 'eccentricity':
@@ -366,10 +367,10 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
     mean_ind_variability = np.reshape(np.array(mean_ind_variability), (5, -1))
 
     data_ind_variability = [[mean_ind_variability[i], 
-                             len(mean_ind_variability[i]) * ['Seed ' + str(i+1)],
+                             len(mean_ind_variability[i]) * [str(i+1)],
                             len(mean_ind_variability[i]) * ['Individual variability']] for i in range(5)]
     data_error = [[error[i], 
-                    len(mean_ind_variability[i]) * ['Seed ' + str(i+1)],
+                    len(mean_ind_variability[i]) * [str(i+1)],
                     len(mean_ind_variability[i]) * ['Error']] for i in range(5)]
     data = np.concatenate(data_ind_variability + data_error, axis = 1)
 
@@ -384,13 +385,15 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
     sns.set_style("whitegrid")
     fig = plt.figure()
     ax = sns.catplot(y='$\Delta$$\t\Theta$', x='Seed',
-                       col='Metric', data=df, palette="flare", kind="swarm", hue='Seed')
+                       col='Metric', data=df, palette="flare", kind="swarm", hue='Seed',)
  
-    ax.set_titles("{col_name}")
+    ax.set_titles("{col_name}", size=15)
+    ax.tick_params(axis='x', labelsize=15)
+    ax.tick_params(axis='y', labelsize=15)  
     if retinotopic_mapping == 'discrete':
-        ax.set_axis_labels("Seed", "Mean Jaccard index")
+        ax.set_axis_labels("Seed", "Mean Jaccard index", fontsize=18)
     else:
-        ax.set_axis_labels("Seed", "Mean $\Delta$$\t\Theta$")
+        ax.set_axis_labels("Seed", "Mean $\Delta$$\t\Theta$", fontsize=18)
     if str(retinotopic_map) == 'eccentricity':
         if retinotopic_mapping == 'continuous':
             plt.ylim([0, 2])
@@ -406,7 +409,6 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
             plt.ylim([0, 40])
         else:
             plt.ylim([0, 1])
-
     fig.suptitle('Early visual areas')
     if threshold != None and retinotopic_mapping == 'continuous':
          plt.savefig('../output/model_selection/ModelSelection_EarlyVisualAreas_' + retinotopic_map + '_' + retinotopic_mapping + '_' + hemisphere + '_' + str(threshold) + '.pdf')
@@ -576,7 +578,7 @@ def explainedvariance_vs_error(path, retinotopic_map, hemisphere, threshold = 10
     Returns:
         plt (matplotlib.pyplot): Plot of the error vs explained variance.
     """
-
+    from functions.datasets import RetinotopyData, RetinotopyData_logbar
     # Development dataset
     dev_set = ['186949', '169747', '826353', '825048', '671855',
                     '751550', '318637', '131722', '137128', '706040'] 
