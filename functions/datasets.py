@@ -41,7 +41,7 @@ class RetinotopyData:
             elif self.model == 'deepRetinotopy21':
                 file_name = f"predicted_deepRetinotopy_21/{self.subject_id}.fs_predicted_{self.retinotopic_map}_{self.hemisphere}_curvatureMyelinFeat_model.func.gii"
             elif self.model == 'benson14':
-                file_name = f"surf/{self.hemisphere}.benson14_{self.retinotopic_map}.gii"
+                file_name = f"surf/{self.hemisphere}.benson14_{self.retinotopic_map}.func.gii"
             elif self.model == 'noise_ceiling':
                 file_name = f"deepRetinotopy/{self.subject_id}.fs_predicted_{self.retinotopic_map}_{self.hemisphere}_curvatureFeat_model.func.gii" # This won't be used
         elif map_type == 'empirical':

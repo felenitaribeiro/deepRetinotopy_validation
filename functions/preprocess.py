@@ -54,36 +54,19 @@ def transform_angle(path_to_empirical_data, hemisphere, radians = False, left_he
     nib.save(template, path_to_save)
     return 'Transformed data saved as ' + path_to_save
 
-def transform_angle_lh_nsd(path_to_empirical_data):
+def transform_polarangle_benson14(path, hemisphere = 'lh'): 
     """
-    Transform angles of the left hemisphere to avoid discontinuity.
-    """
-    path_to_empirical_data = str(path_to_empirical_data)
-    path_to_save = path_to_empirical_data[:-4] + '_transformed.gii'
-    
-    # Load the empirical data
-    template = nib.load(path_to_empirical_data)
-    data = template.agg_data()
-
-    # Rescaling polar angle values
-    sum_180 = data < 180
-    minus_180 = data > 180
-    data[sum_180] = data[sum_180] + 180
-    data[minus_180] = data[minus_180] - 180
-    template.agg_data()[:] = data
-
-    nib.save(template, path_to_save)
-    return 'Transformed data saved as ' + path_to_save
-
-def transform_polarangle_neuropythy(path, hemisphere = 'lh'): 
-    """
-    Transform the polar angle maps from -180 to 180 degrees where the origin in the positive y-axis, to 0 to 360 degrees where
-    the origin is the positive x-axis.
+    Transform the polar angle maps from Neuropythy convention (LH: 0-180 referring to UVM -> RHM -> LVM; 
+      RH: 0-180 referring to UVM -> LHM -> LVM) to standard angle representation from 0 to 360 degrees where
+      the origin is the positive x-axis.
     
     Parameters
     ----------
     path : str
         The path to polar angle map file.
+    hemisphere : str, optional
+        The hemisphere of the polar angle map, either 'lh' for left hemisphere or 'rh' for right hemisphere.
+        Default is 'lh'.
         
     Returns
     -------
