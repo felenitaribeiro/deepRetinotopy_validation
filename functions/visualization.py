@@ -141,7 +141,7 @@ def retinotopic_map_plot(subject_id, path, template_path, prediction = 'predicte
             data = RetinotopyData(path, subject_id, hemisphere, retinotopic_map)
         else:
             data = RetinotopyData(path, subject_id, hemisphere, retinotopic_map, model_index=prediction)
-    elif dataset == 'logbar':
+    elif dataset == 'chn':
         data = RetinotopyData_logbar(path, subject_id, hemisphere, retinotopic_map, experiment=experiment)
     else:
         data = RetinotopyData(path, subject_id, hemisphere, retinotopic_map)
