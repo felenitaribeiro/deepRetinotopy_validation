@@ -244,6 +244,7 @@ class RetinotopyData_logbar(RetinotopyData):
     def apply_mask_to_maps(self, mask):
         """Apply the mask to the predicted, empirical, and variance explained maps."""
         self.mask = mask
+        self.predicted_map = self._apply_mask(self.predicted_map)
         self.empirical_map = self._apply_mask(self.empirical_map)
         self.variance_explained = self._apply_mask(self.variance_explained)
 
@@ -251,6 +252,7 @@ class RetinotopyData_logbar(RetinotopyData):
         """Transform the polar angle values in the empirical and predicted maps."""
         if self.retinotopic_map == 'polarAngle':
             self.empirical_map = self._transform_polarangle(self.empirical_map)
+            self.predicted_map = self._transform_polarangle(self.predicted_map)
         else:
             raise ValueError("Polar angle transformation is only applicable to this map.")
         
