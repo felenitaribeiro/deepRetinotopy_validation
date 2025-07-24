@@ -31,7 +31,10 @@ def transform_angle(path_to_empirical_data, hemisphere, radians = False, left_he
     the origin is the positive x-axis. The angles of the left hemisphere will be shifted by 180 degrees.
     """
     path_to_empirical_data = str(path_to_empirical_data)
-    path_to_save = path_to_empirical_data[:-4] + '_transformed.gii'
+    if left_hemi_shift:
+        path_to_save = path_to_empirical_data[:-4] + '_transformed.gii'
+    else:
+        path_to_save = path_to_empirical_data[:-4] + '_0-360_transformed.gii'
     
     # Load the empirical data
     template = nib.load(path_to_empirical_data)
@@ -92,6 +95,52 @@ def transform_polarangle_benson14(path, hemisphere = 'lh'):
     rotated_angle[mask] = 0
     data.agg_data()[:] = rotated_angle
     file_name = path[:-4] + '_neuropythy.gii'
+
+    nib.save(data, file_name)
+
+    return print('Polar angle map has been transformed and saved as ' + file_name)
+
+def transform_polarangle_to_benson14(path, hemisphere = 'lh'):
+    """
+    Transform the polar angle maps from standard angle representation from 0 to 360 degrees where
+      the origin is the positive x-axis to Neuropythy convention (LH: 0-180 referring to UVM -> RHM -> LVM; 
+      RH: 0-180 referring to UVM -> LHM -> LVM).
+    
+    Parameters
+    ----------
+    path : str
+        The path to polar angle map file.
+    hemisphere : str, optional
+        The hemisphere of the polar angle map, either 'lh' for left hemisphere or 'rh' for right hemisphere.
+        Default is 'lh'.
+        
+    Returns
+    -------
+    numpy.ndarray
+        The transformed polar angle in degrees.
+    """
+    data = nib.load(path)
+    angle = data.agg_data()
+
+    #switch 180-360 degrees to -180-0 degrees
+    over_180 = angle > 180
+    angle[over_180] = angle[over_180] - 360
+
+    if hemisphere == 'lh':
+        angle = - angle
+    mask = angle == 0
+    # Step 1: Rotate by 90 degrees using a rotation matrix
+    angle = angle * np.pi /180
+    x = np.cos(angle)
+    y = np.sin(angle)
+    rotation_matrix = np.array([[0, -1], [1, 0]])
+    rotated_coords = rotation_matrix @ np.array([x, y])
+    rotated_angle = np.degrees(np.arctan2(rotated_coords[1], rotated_coords[0]))
+
+    # Step 2: Shift values to be between 0 and 360
+    rotated_angle[mask] = 0
+    data.agg_data()[:] = rotated_angle
+    file_name = path[:-22] + '_180-180_neuropythy.gii'
 
     nib.save(data, file_name)
 
