@@ -225,6 +225,7 @@ class RetinotopyData_logbar(RetinotopyData):
         self.predicted_map = self._load_map("predicted")
         self.empirical_map = self._load_map("empirical")
         self.variance_explained = self._load_map("variance_explained")
+        self.curvature = self._load_map("curvature")
 
     def _load_map(self, map_type):
         """Override to load logbar data."""
@@ -234,6 +235,8 @@ class RetinotopyData_logbar(RetinotopyData):
             file_name = f"surf/{self.subject_id}.fs_empirical_{self.retinotopic_map}_{self.experiment}_{self.hemisphere}.func.gii"
         elif map_type == 'variance_explained':
             file_name = f"surf/{self.subject_id}.fs_empirical_variance_explained_{self.experiment}_{self.hemisphere}.func.gii"
+        elif map_type == 'curvature':
+            file_name = f"surf/{self.subject_id}.curvature-midthickness.{self.hemisphere}.32k_fs_LR.func.gii"
         else:
             raise ValueError("Invalid map type specified.")
 
