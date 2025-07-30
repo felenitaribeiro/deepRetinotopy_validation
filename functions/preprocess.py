@@ -126,8 +126,6 @@ def transform_polarangle_to_benson14(path, hemisphere = 'lh'):
     over_180 = angle > 180
     angle[over_180] = angle[over_180] - 360
 
-    if hemisphere == 'lh':
-        angle = - angle
     mask = angle == 0
     # Step 1: Rotate by 90 degrees using a rotation matrix
     angle = angle * np.pi /180
@@ -136,8 +134,12 @@ def transform_polarangle_to_benson14(path, hemisphere = 'lh'):
     rotation_matrix = np.array([[0, -1], [1, 0]])
     rotated_coords = rotation_matrix @ np.array([x, y])
     rotated_angle = np.degrees(np.arctan2(rotated_coords[1], rotated_coords[0]))
-
-    # Step 2: Shift values to be between 0 and 360
+    
+    # Step 2: Change signs 
+    if hemisphere == 'lh':
+        rotated_angle = - rotated_angle
+        
+    # Step 3: Apply mask
     rotated_angle[mask] = 0
     data.agg_data()[:] = rotated_angle
     file_name = path[:-22] + '_180-180_neuropythy.gii'
