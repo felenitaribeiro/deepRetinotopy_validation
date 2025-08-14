@@ -1,20 +1,33 @@
 #!/bin/bash
 
-# this script ist used for renaming the files
+# this script is used for renaming the files
+
+subjects_dir=""
+while getopts s: flag
+do
+    case "${flag}" in
+        s) subjects_dir=${OPTARG};;
+        ?)
+           echo "script usage: $(basename "$0") [-s path to subs]" >&2
+           exit 1;;
+    esac
+done
+# in my case the subjects_dir was "/BULK/LABDATA/openneuro/nyu4christian/HCP/freesurfer"
 
 # list of all subjects
 file_names=()
-for d in /BULK/LABDATA/openneuro/nyu4christian/HCP/subjects/* ; do
+for d in $subjects_dir/* ; do
     if [ -d "$d" ]; then
     file_names+=("$(basename "$d")")
   fi
 done
-#file_names=("100610")
+
+
 
 for sub in "${file_names[@]}"; do
 
-    # Ordnerpfad
-    path_sub="/BULK/LABDATA/openneuro/nyu4christian/HCP/freesurfer/$sub/deepRetinotopy"
+    # path to subjects
+    path_sub=""$subjects_dir"/"$sub"/deepRetinotopy"
 
     # Durchlaufe alle Dateien im Ordner
     for file in "$path_sub"/*; do

@@ -1,23 +1,29 @@
 #!/bin/bash
 
+# this script transforms the anlges from deepRetinotopy to the required angles for neuropythy and save them as ..._neuropythy
+
+subjects_dir=""
+while getopts s: flag
+do
+    case "${flag}" in
+        s) subjects_dir=${OPTARG};;
+        ?)
+           echo "script usage: $(basename "$0") [-s path to subs]" >&2
+           exit 1;;
+    esac
+done
+# in my case the subjects_dir was "/BULK/LABDATA/openneuro/nyu4christian/HCP/freesurfer"
+
 # list of all subjects
 file_names=()
-for d in /BULK/LABDATA/openneuro/nyu4christian/HCP/subjects/* ; do
+for d in "$subjects_dir"/* ; do
     if [ -d "$d" ]; then
     file_names+=("$(basename "$d")")
   fi
 done
 
-## Ausgabe zur Kontrolle
-#echo "Gefundene Dateien:"
-#for name in "${file_names[@]}"; do
-#  echo "$name"
-#done
-#exit
-file_names=("100610")
-
 # path to the methods
-path_meth="/home/cbuerger/deepRetinotopy_validation/functions/project"
+path_meth="../functions"
 
 # define hemispheres
 hemisphere=("lh" "rh")
@@ -27,7 +33,7 @@ groups=("empirical" "predicted")
 
 
 for sub in "${file_names[@]}"; do
-    path_sub="/BULK/LABDATA/openneuro/nyu4christian/HCP/freesurfer/$sub/deepRetinotopy"
+    path_sub=""$subjects_dir"/$sub/deepRetinotopy"
 
     for hem in "${hemisphere[@]}"; do
         for group in "${groups[@]}"; do

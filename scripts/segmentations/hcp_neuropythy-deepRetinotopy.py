@@ -1,13 +1,9 @@
 import os
-import neuropythy
+#import neuropythy
 from argparse import ArgumentParser
 import subprocess
-import shutil
-import sys
-sys.path.append("/home/cbuerger/deepRetinotopy_validation/functions/project")
-import methods
-import time
 import numpy as np
+from pathlib import Path
 
 
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
@@ -15,41 +11,31 @@ os.environ['MKL_NUM_THREADS'] = '1'
 
 parser = ArgumentParser(description="Run neuropythy retinotopy registration")
 parser.add_argument("--execute", action="store_true", help="Execute the commands instead of just printing them")
+parser.add_argument("--subjects_dir", required=True, help="Path to subjects directory")
 args = parser.parse_args()
 execute = args.execute
 
+subjects_dir = Path(args.subjects_dir)
+# in my case the subjects_dir was "/BULK/LABDATA/openneuro/nyu4christian/HCP/freesurfer"
 
-subjects_dir="/BULK/LABDATA/openneuro/nyu4christian/HCP/freesurfer"
+#
+#!!! be aware of the weights. I named them exactly like the other parameter files to make it easier
+#
+params = ["polarAngle_neuropythy", "eccentricity", "pRFsize", "weight"]
+groups = ["predicted", "empirical"]
 
-params = ["polarAngle_neuropythy", "eccentricity", "pRFsize", "ones"]
-groups = ["predicted"]
-# , "empirical"
 
-subjects_done = []
-for sub in os.listdir("/BULK/LABDATA/openneuro/nyu4christian/HCP/subjects"):
-    subjects_done.append(sub)
-
+# list all subjects
 subjects = []
 for sub in os.listdir(subjects_dir):
     subjects.append(sub)
-subjects = np.setdiff1d(subjects, subjects_done)
 total = len(subjects)
-#subjects = ["100610"]
-#, "102311"
 
 
 hemispheres=("lh", "rh")
 counter = 0
 for group in groups:
     for sub in subjects:
-        ## Run the Benson14 retinotopy before register_retinotopy
-        #benson_cmd = "python -m neuropythy benson14_retinotopy --verbose --surf-format=mgz {subjects_dir}/{sub}/deepRetinotopy".format(subjects_dir=subjects_dir, sub=sub)
-        #print("# Benson14 Retinotopy for {sub}".format(sub=sub))
-        #print(benson_cmd)
-        #print()
-
-
-
         mgz_results = {}
         
         for hemi in hemispheres:
@@ -60,11 +46,11 @@ for group in groups:
 
 
         if group == "predicted":
-            out_dir = "{subjects_dir}/{sub}/deepRetinotopy/inferred_deepRetinotopy_ones".format(subjects_dir=subjects_dir, sub=sub)
+            out_dir = "{subjects_dir}/{sub}/deepRetinotopy/inferred_deepRetinotopy".format(subjects_dir=subjects_dir, sub=sub)
             if not os.path.exists(out_dir):
                 os.makedirs(out_dir)
         else:
-            out_dir = "{subjects_dir}/{sub}/deepRetinotopy/inferred_empirical_ones".format(subjects_dir=subjects_dir, sub=sub)
+            out_dir = "{subjects_dir}/{sub}/deepRetinotopy/inferred_empirical".format(subjects_dir=subjects_dir, sub=sub)
             if not os.path.exists(out_dir):
                 os.makedirs(out_dir)
 
@@ -92,11 +78,11 @@ for group in groups:
             lh_angle=mgz_results['lh']['polarAngle_neuropythy'],
             lh_eccen=mgz_results['lh']['eccentricity'],
             lh_pRFsize=mgz_results['lh']['pRFsize'],
-            lh_weight=mgz_results['lh']['ones'],
+            lh_weight=mgz_results['lh']['weight'],
             rh_angle=mgz_results['rh']['polarAngle_neuropythy'],
             rh_eccen=mgz_results['rh']['eccentricity'],
             rh_pRFsize=mgz_results['rh']['pRFsize'],
-            rh_weight=mgz_results['rh']['ones']
+            rh_weight=mgz_results['rh']['weight']
         )
 
         print("# Command for {sub}".format(sub=sub))
