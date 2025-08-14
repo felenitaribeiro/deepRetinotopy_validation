@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# this script ist used for renaming the files
 
 # list of all subjects
 file_names=()
