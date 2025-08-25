@@ -100,7 +100,7 @@ def transform_polarangle_benson14(path, hemisphere = 'lh'):
 
     return print('Polar angle map has been transformed and saved as ' + file_name)
 
-def transform_polarangle_to_benson14(path, hemisphere = 'lh'):
+def transform_polarangle_to_benson14(path, deepretinotopy_data = False):
     """
     Transform the polar angle maps from standard angle representation from 0 to 360 degrees where
       the origin is the positive x-axis to Neuropythy convention (LH: 0-180 referring to UVM -> RHM -> LVM; 
@@ -136,13 +136,14 @@ def transform_polarangle_to_benson14(path, hemisphere = 'lh'):
     rotated_angle = np.degrees(np.arctan2(rotated_coords[1], rotated_coords[0]))
     
     # Step 2: Change signs 
-    if hemisphere == 'lh':
-        rotated_angle = - rotated_angle
+    rotated_angle = - rotated_angle
         
     # Step 3: Apply mask
     rotated_angle[mask] = 0
     data.agg_data()[:] = rotated_angle
     file_name = path[:-22] + '_180-180_neuropythy.gii'
+    if deepretinotopy_data:
+        file_name = path[:-16] + '_180-180_neuropythy.gii'
 
     nib.save(data, file_name)
 
