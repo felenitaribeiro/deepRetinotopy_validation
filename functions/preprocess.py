@@ -1,6 +1,7 @@
 import numpy as np
 import nibabel as nib
 import sys
+import argparse
 sys.path.append('..')
 
 def polarcoord(x_data, y_data):
@@ -100,11 +101,11 @@ def transform_polarangle_benson14(path, hemisphere = 'lh'):
 
     return print('Polar angle map has been transformed and saved as ' + file_name)
 
-def transform_polarangle_to_benson14(path, deepretinotopy_data = False):
+def transform_polarangle_to_benson14(path, path_to_save = None, deepretinotopy_data = False, hemisphere = 'lh'):
     """
     Transform the polar angle maps from standard angle representation from 0 to 360 degrees where
       the origin is the positive x-axis to Neuropythy convention (LH: 0-180 referring to UVM -> RHM -> LVM; 
-      RH: 0-180 referring to UVM -> LHM -> LVM).
+      RH: 0-(-)180 referring to UVM -> LHM -> LVM).
     
     Parameters
     ----------
@@ -121,12 +122,13 @@ def transform_polarangle_to_benson14(path, deepretinotopy_data = False):
     """
     data = nib.load(path)
     angle = data.agg_data()
+    
+    mask = angle == 0
 
     #switch 180-360 degrees to -180-0 degrees
     over_180 = angle > 180
     angle[over_180] = angle[over_180] - 360
 
-    mask = angle == 0
     # Step 1: Rotate by 90 degrees using a rotation matrix
     angle = angle * np.pi /180
     x = np.cos(angle)
@@ -135,16 +137,34 @@ def transform_polarangle_to_benson14(path, deepretinotopy_data = False):
     rotated_coords = rotation_matrix @ np.array([x, y])
     rotated_angle = np.degrees(np.arctan2(rotated_coords[1], rotated_coords[0]))
     
-    # Step 2: Change signs 
-    rotated_angle = - rotated_angle
+    # Step 2: Reverse (mirror) coordinates
+    if hemisphere == 'lh':
+        rotated_angle = np.abs(rotated_angle - 180)
+    if hemisphere == 'rh':
+        rotated_angle = rotated_angle + 180
         
     # Step 3: Apply mask
     rotated_angle[mask] = 0
     data.agg_data()[:] = rotated_angle
-    file_name = path[:-22] + '_180-180_neuropythy.gii'
-    if deepretinotopy_data:
-        file_name = path[:-16] + '_180-180_neuropythy.gii'
-
+    if path_to_save == None:
+        file_name = path[:-22] + '_180-180_neuropythy.gii'
+        if deepretinotopy_data:
+            file_name = path[:-16] + '_180-180_neuropythy.gii'
+    else:
+        file_name = path_to_save
     nib.save(data, file_name)
 
     return print('Polar angle map has been transformed and saved as ' + file_name)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("method", choices=["transform_polarangle_to_benson14"])
+    parser.add_argument("--path_to_use", type=str)
+    parser.add_argument("--path_to_save", type=str)
+    parser.add_argument("--hemisphere", type=str)
+    args = parser.parse_args()
+
+    
+    if args.method == "transform_polarangle_to_benson14":
+        transform_polarangle_to_benson14(args.path_to_use, args.path_to_save, hemisphere=args.hemisphere)
