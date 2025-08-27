@@ -1,18 +1,18 @@
 #!/bin/bash
-
+ml freesurfer/7.3.2
 # this script transforms the anlges from deepRetinotopy to the required angles for neuropythy and save them as ..._neuropythy
 
 subjects_dir=""
-while getopts s: flag
+while getopts s:r: flag
 do
     case "${flag}" in
         s) subjects_dir=${OPTARG};;
+        r) path_to_validation_repo=${OPTARG};;
         ?)
-           echo "script usage: $(basename "$0") [-s path to subs]" >&2
+           echo "script usage: $(basename "$0") [-s path to subs] [-r path to validation repo]" >&2
            exit 1;;
     esac
 done
-# in my case the subjects_dir was "/BULK/LABDATA/openneuro/nyu4christian/HCP/freesurfer"
 
 # list of all subjects
 file_names=()
@@ -21,9 +21,6 @@ for d in "$subjects_dir"/* ; do
     file_names+=("$(basename "$d")")
   fi
 done
-
-# path to the methods
-path_meth="../functions"
 
 # define hemispheres
 hemisphere=("lh" "rh")
@@ -44,11 +41,9 @@ for sub in "${file_names[@]}"; do
             # transform the angles
             path_to_use="$path_sub"/"$sub"."$group"_polarAngle."$hem".native.func.gii
             path_to_save="$path_sub"/"$sub"."$group"_polarAngle_neuropythy."$hem".native.func.gii
-            cd $path_meth
-            python methods.py transform_angle_native_neuropythy --path_to_use "$path_to_use" --path_to_save "$path_to_save" --hemisphere "$hem"
+            python $path_to_validation_repo/functions/preprocess.py transform_polarangle_to_benson14 --path_to_use "$path_to_use" --path_to_save "$path_to_save" --hemisphere $hem
             # wait for all background processes to finish
             wait
-
 
             # save all files as .mgz files
             params=("eccentricity" "polarAngle_neuropythy" "pRFsize")

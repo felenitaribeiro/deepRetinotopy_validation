@@ -1,10 +1,8 @@
 import os
-#import neuropythy
-from argparse import ArgumentParser
 import subprocess
 import numpy as np
 from pathlib import Path
-
+from argparse import ArgumentParser
 
 os.environ['OPENBLAS_NUM_THREADS'] = '1'
 os.environ['MKL_NUM_THREADS'] = '1'
@@ -12,11 +10,12 @@ os.environ['MKL_NUM_THREADS'] = '1'
 parser = ArgumentParser(description="Run neuropythy retinotopy registration")
 parser.add_argument("--execute", action="store_true", help="Execute the commands instead of just printing them")
 parser.add_argument("--subjects_dir", required=True, help="Path to subjects directory")
+parser.add_argument("--subject_id", default=None, help="Subject ID to be processed")
 args = parser.parse_args()
 execute = args.execute
 
+print(args.subject_id)
 subjects_dir = Path(args.subjects_dir)
-# in my case the subjects_dir was "/BULK/LABDATA/openneuro/nyu4christian/HCP/freesurfer"
 
 #
 #!!! be aware of the weights. I named them exactly like the other parameter files to make it easier
@@ -26,11 +25,14 @@ groups = ["predicted", "empirical"]
 
 
 # list all subjects
-subjects = []
-for sub in os.listdir(subjects_dir):
-    subjects.append(sub)
-total = len(subjects)
-
+if args.subject_id is None:
+    subjects = []
+    for sub in os.listdir(subjects_dir):
+        subjects.append(sub)
+    total = len(subjects)
+else:
+    subjects = [args.subject_id]
+    total = len(subjects)
 
 hemispheres=("lh", "rh")
 counter = 0
@@ -93,9 +95,6 @@ for group in groups:
 
         # Execute commands if execute is True
         if execute:
-            # print("Executing Benson14 retinotopy for {sub}...".format(sub=sub))
-            # subprocess.run(benson_cmd, shell=True, check=True)
-
             print("Executing register_retinotopy for {sub}".format(sub=sub))
             result = subprocess.run(register_cmd, shell=True, capture_output=True, text=True)
 
