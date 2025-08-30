@@ -54,7 +54,10 @@ for sub in "${file_names[@]}"; do
                 wait
             done
             if [ "$group" = "predicted" ]; then
-                mri_convert "$sub".dummy_variance_explained."$hem".native.func.gii "$sub".predicted_weight."$hem".native.func.mgz
+                for dummy_weight in mean ones; do
+                    echo $dummy_weight
+                    mri_convert "$sub"."$dummy_weight"_variance_explained."$hem".native.func.gii "$sub".predicted_"$dummy_weight"_weight."$hem".native.func.mgz
+                done
             else
                 mri_convert "$sub".empirical_variance_explained."$hem".native.func.gii "$sub".empirical_weight."$hem".native.func.mgz
             fi

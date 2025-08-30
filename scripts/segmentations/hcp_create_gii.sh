@@ -34,17 +34,16 @@ hemisphere=("lh" "rh")
 
 for sub in "${file_names[@]}"; do
     
-    path_emp=""$subjects_dir"/$sub/deepRetinotopy/inferred_empirical"
-    path_deep=""$subjects_dir"/$sub/deepRetinotopy/inferred_deepRetinotopy"
-
-    for hemi in "${hemisphere[@]}"; do
-        # save all files as .gii files
-        params=("angle" "eccen" "sigma" "varea")
-        for param in "${params[@]}"; do
-            mris_convert -c "$path_emp"/"$hemi".inferred_"$param".mgz "$subjects_dir"/$sub/surf/"$hemi".white "$path_emp"/"$hemi".inferred_"$param".gii
-            wait
-            mris_convert -c "$path_deep"/"$hemi".inferred_"$param".mgz "$subjects_dir"/$sub/surf/"$hemi".white "$path_deep"/"$hemi".inferred_"$param".gii
-            wait
+    # path_emp=""$subjects_dir"/$sub/deepRetinotopy/inferred_empirical"
+    # path_deep=""$subjects_dir"/$sub/deepRetinotopy/inferred_deepRetinotopy"
+    for path in ""$subjects_dir"/$sub/deepRetinotopy/inferred_empirical" ""$subjects_dir"/$sub/deepRetinotopy/inferred_deepRetinotopy" \
+            ""$subjects_dir"/$sub/deepRetinotopy/inferred_deepRetinotopy_ones"; do 
+        for hemi in "${hemisphere[@]}"; do
+            # save all files as .gii files
+            params=("angle" "eccen" "sigma" "varea")
+            for param in "${params[@]}"; do
+                mris_convert -c "$path"/"$hemi".inferred_"$param".mgz "$subjects_dir"/$sub/surf/"$hemi".white "$path"/"$hemi".inferred_"$param".gii
+            done
         done
     done
 done
