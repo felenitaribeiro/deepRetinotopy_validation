@@ -138,5 +138,5 @@ if __name__ == "__main__":
     args.hemispheres=("lh", "rh")
 
     process_empirical_data(args)
-    for dummy_weight in ['mean','ones']: 
+    for dummy_weight in ['ones', 'mean']: 
         process_deepRetinotopy_data(dummy_weight, args)
