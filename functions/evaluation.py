@@ -794,12 +794,13 @@ def explainedvariance_vs_error_across_datasets(path, dataset_name, experiment, r
     ax = sns.barplot(y='Mean error', x='Variance explained', data=df, palette="Reds_r", errorbar='se')
     ax.set_xticklabels(range(10, 110, 10))
     fig.suptitle('Early visual areas in the ' + hemisphere.upper() )
-    # if retinotopic_map == 'eccentricity':
-    #     plt.ylim([0, 5])
-    # elif retinotopic_map == 'pRFsize':
-    #     plt.ylim([0, 1])
-    # else:
-    #     plt.ylim([0, 80])
+    if retinotopic_map == 'eccentricity':
+        plt.ylim([0, .5])
+    elif retinotopic_map == 'pRFsize':
+        plt.ylim([0, 1.5])
+    else:
+        plt.ylim([0, 80])
+
     plt.savefig(f'../output/error_vs_explained_variance/{dataset_name}/{retinotopic_map}_{hemisphere}.pdf')
     plt.show()
     return
