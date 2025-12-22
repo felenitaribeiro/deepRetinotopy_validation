@@ -3,6 +3,9 @@ ml connectomeworkbench/1.5.0
 ml freesurfer/7.3.2
 ml deepretinotopy/1.0.11
 
+source ~/miniforge3/etc/profile.d/conda.sh
+conda activate deepretinotopy_validation
+
 while getopts d:t:r: flag
 do
     case "${flag}" in
