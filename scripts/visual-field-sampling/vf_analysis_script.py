@@ -302,7 +302,7 @@ def compute_surface_area(vertices: np.ndarray, faces: np.ndarray, mask: np.ndarr
 
 
 def generate_masks(freesurfer_directory: str, subject_id: str, hemisphere: str, 
-                  retinotopic_mapping: str = 'deepRetinotopy',
+                  retinotopic_mapping: str = 'deepRetinotopy', group: str = 'all',
                   wedge_size: int = 35) -> Tuple[np.ndarray, ...]:
     """
     Generate masks for wedges of specified size.
@@ -331,6 +331,11 @@ def generate_masks(freesurfer_directory: str, subject_id: str, hemisphere: str,
     if retinotopic_mapping == 'deepRetinotopy':
         polar_angle = nib.load(f'{freesurfer_directory}/{subject_id}/deepRetinotopy/{subject_id}.predicted_polarAngle_model.{hemisphere}.native.func.gii').darrays[0].data
         eccentricity = nib.load(f'{freesurfer_directory}/{subject_id}/deepRetinotopy/{subject_id}.predicted_eccentricity_model.{hemisphere}.native.func.gii').darrays[0].data
+    elif retinotopic_mapping == 'empirical':
+        # polar_angle = nib.load(f'{freesurfer_directory}/../prfanalyze-vista/{group}/{subject_id}/{hemisphere}.angle_0-360_transformed.gii').darrays[0].data
+        # eccentricity = nib.load(f'{freesurfer_directory}/../prfanalyze-vista/{group}/{subject_id}/bayesian_retinotopy/{hemisphere}.inferred_eccen.gii').darrays[0].data
+        polar_angle = nib.load(f'{freesurfer_directory}/{subject_id}/deepRetinotopy/{subject_id}.empirical_polarAngle.{hemisphere}.native.func.gii').darrays[0].data
+        eccentricity = nib.load(f'{freesurfer_directory}/{subject_id}/deepRetinotopy/{subject_id}.empirical_eccentricity.{hemisphere}.native.func.gii').darrays[0].data
     else:
         raise ValueError(f"Unknown retinotopic mapping type: {retinotopic_mapping}")
     
@@ -377,6 +382,7 @@ def generate_masks(freesurfer_directory: str, subject_id: str, hemisphere: str,
 def analyze_subject_vf_areas(freesurfer_directory: str, subject: str, 
                            retinotopic_mapping: str = 'deepRetinotopy', 
                            wedge_size: int = 35, 
+                           group: str = 'all',
                            hemispheres: str = 'both') -> Dict:
     """
     Analyze visual field areas for one subject across hemispheres.
@@ -421,7 +427,7 @@ def analyze_subject_vf_areas(freesurfer_directory: str, subject: str,
         faces = surface.darrays[1].data     # triangle faces
 
         upper_vm_mask, lower_vm_mask, horizontal_l_mask, horizontal_u_mask, _, v1_roi = generate_masks(
-            freesurfer_directory, subject, hemisphere, retinotopic_mapping, 
+            freesurfer_directory, subject, hemisphere, retinotopic_mapping, group,
             wedge_size=wedge_size)
 
         # Calculate surface areas
@@ -534,7 +540,14 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Example usage:
+    # Basic usage:
     python vf_analysis_script.py --freesurfer_dir /path/to/freesurfer --template_dir /path/to/templates --hcp_dir /path/to/hcp --output_file results.csv
+
+    # Analyzing multiple methods and groups (space-separated):
+    python vf_analysis_script.py --freesurfer_dir /path/to/freesurfer --methods deepRetinotopy empirical --groups adults children --output_file results.csv
+
+    # Or using repeated flags:
+    python vf_analysis_script.py --freesurfer_dir /path/to/freesurfer --methods deepRetinotopy --methods empirical --groups adults --groups children
         """)
     
     parser.add_argument('--freesurfer_dir', type=str, required=True, help='Path to FreeSurfer derivatives directory')
@@ -544,6 +557,8 @@ Example usage:
     parser.add_argument('--wedge_size', type=int, default=45, help='Visual field wedge size in degrees')
     parser.add_argument('--methods', nargs='+', default=['deepRetinotopy'], 
                        help='Retinotopic mapping methods to analyze')
+    parser.add_argument('--groups', nargs='+', default=['all'],
+                       help='Groups to analyze (e.g., adults children). Use "all" for no group separation')
     parser.add_argument('--n_jobs', type=int, help='Number of parallel processes for resampling (default: all CPUs)')
     parser.add_argument('--skip_resampling', action='store_true', help='Skip ROI resampling step')
     parser.add_argument('--subjects', nargs='+', help='Specific subjects to analyze (optional)')
@@ -623,31 +638,34 @@ Example usage:
     print("\nStep 2: Analyzing surface areas...")
     results = []
     
-    total_analyses = len(args.methods) * len(subjects)
+    total_analyses = len(args.methods) * len(args.groups) * len(subjects)
     current_analysis = 0
     
     for retinotopic_mapping in args.methods:
-        for subject in subjects:
-            current_analysis += 1
-            print(f"Analyzing {subject} with {retinotopic_mapping} ({current_analysis}/{total_analyses})")
-            
-            try:
-                result = analyze_subject_vf_areas(
-                    args.freesurfer_dir, subject,
-                    retinotopic_mapping=retinotopic_mapping,
-                    wedge_size=args.wedge_size)
-                result['method'] = retinotopic_mapping
+        for group in args.groups:
+            for subject in subjects:
+                current_analysis += 1
+                print(f"Analyzing {subject} with {retinotopic_mapping} (group: {group}) ({current_analysis}/{total_analyses})")
                 
-                # Extract age from subject ID if possible
                 try:
-                    result['age'] = int(subject[-2:])
-                except (ValueError, IndexError):
-                    result['age'] = 'N/A'
+                    result = analyze_subject_vf_areas(
+                        args.freesurfer_dir, subject,
+                        retinotopic_mapping=retinotopic_mapping,
+                        group=group,
+                        wedge_size=args.wedge_size)
+                    result['method'] = retinotopic_mapping
+                    result['group'] = group
+                    
+                    # Extract age from subject ID if possible
+                    try:
+                        result['age'] = int(subject[-2:])
+                    except (ValueError, IndexError):
+                        result['age'] = 'N/A'
+                    
+                    results.append(result)
                 
-                results.append(result)
-                
-            except Exception as e:
-                print(f"Error processing {subject} with {retinotopic_mapping}: {e}")
+                except Exception as e:
+                    print(f"Error processing {subject} with {retinotopic_mapping} (group: {group}): {e}")
     
     # Step 3: Save results
     print(f"\nStep 3: Saving {len(results)} results to {args.output_file}...")
