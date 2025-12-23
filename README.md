@@ -1,8 +1,6 @@
 # Repo with code for the validation of deepRetinotopy toolbox
 
-This repository contains the code to validate the [deepRetinotopy toolbox](https://github.com/felenitaribeiro/deepRetinotopy_TheToolbox), accompanying the following publication:
-
-[Add preprint here](https://www.biorxiv.org/content/10.1101/2025.11.27.690210v2)
+This repository contains the code to validate the [deepRetinotopy toolbox](https://github.com/felenitaribeiro/deepRetinotopy_TheToolbox), accompanying [our manuscript](https://www.biorxiv.org/content/10.1101/2025.11.27.690210v2)
 
 ## How to run the validation code
 
