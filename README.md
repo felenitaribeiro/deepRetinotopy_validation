@@ -22,4 +22,6 @@ cd deepRetinotopy_validation
 git clone https://github.com/felenitaribeiro/deepRetinotopy_TheToolbox.git
 ```
 
-### 3. Add other steps
+### 3. Manuscript's analyses
+
+You can find all code and plotting functionalities for reproducing the analyses reported in our manuscript in the *notebooks* folder, where notebooks are named according to the manuscript sections. We will continue to update the notebooks to enable reproducibility, as there are many hard-coded paths. However, one can already inspect the figures rendered in the notebooks to compare with our manuscript.
