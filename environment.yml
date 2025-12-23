@@ -1,4 +1,4 @@
-name: deepretinotopy
+name: deepretinotopy_validation
 channels:
   - conda-forge
   - defaults

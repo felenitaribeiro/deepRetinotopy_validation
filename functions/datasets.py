@@ -82,7 +82,7 @@ class RetinotopyData:
             data (numpy array): Transformed polar angle values
         """
         mask = data <= 0
-        subtract = data > 180
+        subtract = data >= 180
         add = data < 180
         data[subtract] = data[subtract] - 180
         data[add] = data[add] + 180
