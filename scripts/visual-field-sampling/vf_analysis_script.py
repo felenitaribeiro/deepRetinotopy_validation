@@ -332,8 +332,6 @@ def generate_masks(freesurfer_directory: str, subject_id: str, hemisphere: str,
         polar_angle = nib.load(f'{freesurfer_directory}/{subject_id}/deepRetinotopy/{subject_id}.predicted_polarAngle_model.{hemisphere}.native.func.gii').darrays[0].data
         eccentricity = nib.load(f'{freesurfer_directory}/{subject_id}/deepRetinotopy/{subject_id}.predicted_eccentricity_model.{hemisphere}.native.func.gii').darrays[0].data
     elif retinotopic_mapping == 'empirical':
-        # polar_angle = nib.load(f'{freesurfer_directory}/../prfanalyze-vista/{group}/{subject_id}/{hemisphere}.angle_0-360_transformed.gii').darrays[0].data
-        # eccentricity = nib.load(f'{freesurfer_directory}/../prfanalyze-vista/{group}/{subject_id}/bayesian_retinotopy/{hemisphere}.inferred_eccen.gii').darrays[0].data
         polar_angle = nib.load(f'{freesurfer_directory}/{subject_id}/deepRetinotopy/{subject_id}.empirical_polarAngle.{hemisphere}.native.func.gii').darrays[0].data
         eccentricity = nib.load(f'{freesurfer_directory}/{subject_id}/deepRetinotopy/{subject_id}.empirical_eccentricity.{hemisphere}.native.func.gii').darrays[0].data
     else:
