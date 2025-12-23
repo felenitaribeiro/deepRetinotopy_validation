@@ -1,3 +1,6 @@
+/.conda/*
+/.vscode/*
+/.pytest_cache/*
 /datasets/*
 /templates/*
 /HCP/*
@@ -8,5 +11,8 @@
 /NYU_bar_model_predictions/*
 /tmp/*
 /NYU_bar_model_predictions/*
-/.conda/*
 /samsrf_all/*
+/notebooks/*.gii
+/notebooks/*.pkl
+/freesurfer/* 
+/deepRetinotopy_TheToolbox/*
