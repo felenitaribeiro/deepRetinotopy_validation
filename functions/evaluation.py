@@ -260,7 +260,7 @@ def remove_outliers(predicted_map, empirical_map, retinotopic_map, dataset_name)
         predicted_map = np.clip(predicted_map, 0, None)
     return predicted_map, empirical_map
 
-def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mapping = 'continuous', threshold = 10):
+def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mapping = 'continuous', threshold = 10, output_dir = '../output/'):
     """Calculate the inter-individual variability in predicted maps and the error
     between predicted and empirical maps for different models.
     
@@ -400,8 +400,8 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
     df['$\Delta$$\t\Theta$'] = df['$\Delta$$\t\Theta$'].astype(float)
 
     # Generate plot
-    if os.path.isdir('../output/model_selection/') == False:
-        os.makedirs('../output/model_selection/')
+    if os.path.isdir(output_dir + 'model_selection/') == False:
+        os.makedirs(output_dir + 'model_selection/')
         
     sns.set_style("whitegrid")
     fig = plt.figure()
@@ -432,16 +432,16 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
             plt.ylim([0, 1])
     fig.suptitle('Early visual areas')
     if threshold != None and retinotopic_mapping == 'continuous':
-         plt.savefig('../output/model_selection/ModelSelection_EarlyVisualAreas_' + retinotopic_map + '_' + retinotopic_mapping + '_' + hemisphere + '_' + str(threshold) + '.pdf')
+         plt.savefig(output_dir + 'model_selection/ModelSelection_EarlyVisualAreas_' + retinotopic_map + '_' + retinotopic_mapping + '_' + hemisphere + '_' + str(threshold) + '.pdf')
     else:
-         plt.savefig('../output/model_selection/ModelSelection_EarlyVisualAreas_' + retinotopic_map + '_' + retinotopic_mapping + '_' + hemisphere + '.pdf')
+         plt.savefig(output_dir + 'model_selection/ModelSelection_EarlyVisualAreas_' + retinotopic_map + '_' + retinotopic_mapping + '_' + hemisphere + '.pdf')
     plt.show()
     return df
 
 def predicted_vs_empirical(path, dataset_name, retinotopic_maps, hemispheres, 
                                     threshold = None, experiment = None, 
                                     region_of_interest = 'all', pool_of_participants = 'all', 
-                                    plot_type = 'hexbin'):
+                                    plot_type = 'hexbin', output_dir = '../output/'):
     """Generate hexbin plots of predicted and empirical maps for different models.
     
     Args:
@@ -483,8 +483,8 @@ def predicted_vs_empirical(path, dataset_name, retinotopic_maps, hemispheres,
         final_mask_L, final_mask_R, index_L_mask, index_R_mask = roi_parcel(areas)
 
     # Make output directory
-    if os.path.isdir('../output/model_evaluation/' + dataset_name) == False:
-        os.makedirs('../output/model_evaluation/' + dataset_name)
+    if os.path.isdir(output_dir + 'model_evaluation/' + dataset_name) == False:
+        os.makedirs(output_dir + 'model_evaluation/' + dataset_name)
 
     # List of subjects
     list_of_sub_ids = return_list_of_subs(dataset_name, pool_of_participants)
@@ -572,7 +572,7 @@ def predicted_vs_empirical(path, dataset_name, retinotopic_maps, hemispheres,
         elif pool_of_participants == 'adults':
             pool_of_participants_name = '_adults'
         ## Base path
-        base_path = f'../output/model_evaluation/{dataset_name}/PredictedVsEmpirical_{retinotopic_map}{experiment_name}'
+        base_path = f'{output_dir}model_evaluation/{dataset_name}/PredictedVsEmpirical_{retinotopic_map}{experiment_name}'
         ## Create file suffix
         if len(hemispheres) > 1:
             hemisphere_name = 'both'
@@ -588,7 +588,7 @@ def predicted_vs_empirical(path, dataset_name, retinotopic_maps, hemispheres,
     return correlation_scores_table
 
 
-def explainedvariance_vs_error(path, retinotopic_map, hemisphere, threshold = 10):
+def explainedvariance_vs_error(path, retinotopic_map, hemisphere, threshold = 10, output_dir = '../output/'):
     """Calculate the inter-individual variability in predicted maps and the error
     between predicted and empirical maps for different models.
     
@@ -677,8 +677,8 @@ def explainedvariance_vs_error(path, retinotopic_map, hemisphere, threshold = 10
         df = pd.DataFrame(columns=['Mean error', 'Variance explained'],
                       data=data)
         
-        if os.path.isdir('../output/error_vs_explained_variance/') == False:
-            os.makedirs('../output/error_vs_explained_variance/')
+        if os.path.isdir(output_dir + 'error_vs_explained_variance/') == False:
+            os.makedirs(output_dir + 'error_vs_explained_variance/')
 
         sns.set_style("white")
         fig = plt.figure()
@@ -691,11 +691,11 @@ def explainedvariance_vs_error(path, retinotopic_map, hemisphere, threshold = 10
             plt.ylim([0, 1])
         else:
             plt.ylim([0, 80])
-        plt.savefig('../output/error_vs_explained_variance/' + retinotopic_map + '_' + hemisphere + '_Seed' + str(model + 1) + '.pdf')
+        plt.savefig(output_dir + 'error_vs_explained_variance/' + retinotopic_map + '_' + hemisphere + '_Seed' + str(model + 1) + '.pdf')
         plt.show()
     return
 
-def explainedvariance_vs_error_across_datasets(path, dataset_name, experiment, retinotopic_map, hemisphere, threshold = 10):
+def explainedvariance_vs_error_across_datasets(path, dataset_name, experiment, retinotopic_map, hemisphere, threshold = 10, output_dir = '../output/'):
     """Calculate the inter-individual variability in predicted maps and the error
     between predicted and empirical maps for different models.
     
@@ -786,8 +786,8 @@ def explainedvariance_vs_error_across_datasets(path, dataset_name, experiment, r
     df = pd.DataFrame(columns=['Mean error', 'Variance explained'],
                     data=data)
     
-    if os.path.isdir('../outputerror_vs_explained_variance' + dataset_name) == False:
-        os.makedirs('../outputerror_vs_explained_variance' + dataset_name)
+    if os.path.isdir(output_dir + 'error_vs_explained_variance' + dataset_name) == False:
+        os.makedirs(output_dir + 'error_vs_explained_variance' + dataset_name)
 
     sns.set_style("white")
     fig = plt.figure()
@@ -801,7 +801,7 @@ def explainedvariance_vs_error_across_datasets(path, dataset_name, experiment, r
     else:
         plt.ylim([0, 80])
 
-    plt.savefig(f'../output/error_vs_explained_variance/{dataset_name}/{retinotopic_map}_{hemisphere}.pdf')
+    plt.savefig(f'{output_dir}error_vs_explained_variance/{dataset_name}/{retinotopic_map}_{hemisphere}.pdf')
     plt.show()
     return
 

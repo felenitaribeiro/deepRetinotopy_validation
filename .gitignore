@@ -16,3 +16,4 @@
 /notebooks/*.pkl
 /freesurfer/* 
 /deepRetinotopy_TheToolbox/*
+/output_revision/*

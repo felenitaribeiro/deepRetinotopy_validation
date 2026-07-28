@@ -217,8 +217,8 @@ def retinotopic_map_plot(subject_id, path, template_path, prediction = 'predicte
         data[final_mask_L != 1] = 0
 
     else:
-        if retinotopic_map == 'polarAngle':
-            data.apply_transform_polarangle()
+        # if retinotopic_map == 'polarAngle':
+        #     data.apply_transform_polarangle()
         if prediction == 'empirical':
             data = data.empirical_map + threshold
         else: 

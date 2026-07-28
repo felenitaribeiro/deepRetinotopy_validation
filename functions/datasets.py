@@ -8,9 +8,25 @@ sys.path.append(os.path.join(osp.dirname(osp.abspath(__file__)), '..'))
 
 from functions.visualization import roi, roi_earlyvisualcortex
 
+# Filename tags for the visual coordinate models. Polar angle and eccentricity are
+# derived from the model trained on visual coordinates (x, y), whereas pRF size is
+# predicted by its own model, hence the different tag.
+VISUALCOORD_MODEL_TAGS = {
+    'polarAngle': 'visualCoord',
+    'eccentricity': 'visualCoord',
+    'x': 'visualCoord',
+    'y': 'visualCoord',
+    'pRFsize': 'pRFsize',
+}
+
+# The visual coordinate models already predict left hemisphere polar angle in the
+# transformed convention, so only the empirical maps require the transformation.
+MODELS_WITHOUT_POLARANGLE_TRANSFORM = {'deepRetinotopy25_visualCoord'}
+
 class RetinotopyData:
-    def __init__(self, path, subject_id, hemisphere, 
-                 retinotopic_map, number_hemi_nodes=int(32492), model = 'deepRetinotopy25', model_index=None, split_half=None):
+    def __init__(self, path, subject_id, hemisphere,
+                 retinotopic_map, number_hemi_nodes=int(32492), model = 'deepRetinotopy25_visualCoord', model_index=None, split_half=None,
+                 empirical_dir='deepRetinotopy'):
         self.path = path
         self.subject_id = subject_id
         self.hemisphere = hemisphere
@@ -19,6 +35,7 @@ class RetinotopyData:
         self.model = model  # model type, e.g., 'deepRetinotopy' or 'benson14'
         self.model_index = model_index  # optional model index for specific seeds from deepRetinotopy
         self.split_half = split_half  # optional parameter for split-half analysis
+        self.empirical_dir = empirical_dir  # subdirectory holding the empirical maps
 
         # Load maps during initialization
         self.predicted_map = self._load_map("predicted")
@@ -38,6 +55,19 @@ class RetinotopyData:
                     file_name = f"deepRetinotopy/{self.subject_id}.fs_predicted_{self.retinotopic_map}_{self.hemisphere}_curvatureFeat_model{self.model_index}.func.gii"
                 else:
                     file_name = f"deepRetinotopy/{self.subject_id}.fs_predicted_{self.retinotopic_map}_{self.hemisphere}_curvatureFeat_model.func.gii"
+            elif self.model == 'deepRetinotopy25_visualCoord':
+                if self.retinotopic_map not in VISUALCOORD_MODEL_TAGS:
+                    raise ValueError(
+                        f"No visual coordinate model available for the map '{self.retinotopic_map}'.")
+                tag = VISUALCOORD_MODEL_TAGS[self.retinotopic_map]
+                # These models are only distributed as individual seeds (model1-model5),
+                # so a model index is required. The index-free name is kept for the case
+                # an ensemble map is generated later on.
+                if self.model_index is not None:
+                    tag = f"{tag}-model{self.model_index}"
+                else:
+                    tag = f"{tag}-model1"
+                file_name = f"deepRetinotopy/{self.subject_id}.fs_predicted_{self.retinotopic_map}_{self.hemisphere}_curvatureFeat_{tag}.func.gii"
             elif self.model == 'deepRetinotopy21':
                 file_name = f"predicted_deepRetinotopy_21/{self.subject_id}.fs_predicted_{self.retinotopic_map}_{self.hemisphere}_curvatureMyelinFeat_model.func.gii"
             elif self.model == 'benson14':
@@ -45,15 +75,15 @@ class RetinotopyData:
             elif self.model == 'noise_ceiling':
                 file_name = f"deepRetinotopy/{self.subject_id}.fs_predicted_{self.retinotopic_map}_{self.hemisphere}_curvatureFeat_model.func.gii" # This won't be used
         elif map_type == 'empirical':
-            file_name = f"surf/{self.subject_id}.fs_empirical_{self.retinotopic_map}_{self.hemisphere}.func.gii"
+            file_name = f"{self.empirical_dir}/{self.subject_id}.fs_empirical_{self.retinotopic_map}_{self.hemisphere}.func.gii"
         elif map_type == 'variance_explained':
-            file_name = f"surf/{self.subject_id}.fs_empirical_variance_explained_{self.hemisphere}.func.gii"
+            file_name = f"{self.empirical_dir}/{self.subject_id}.fs_empirical_variance_explained_{self.hemisphere}.func.gii"
         elif map_type == 'curvature':
             file_name = f"surf/{self.subject_id}.curvature-midthickness.{self.hemisphere}.32k_fs_LR.func.gii"
         elif map_type == 'empirical_split2':
-            file_name = f"surf/{self.subject_id}.fs_empirical_{self.retinotopic_map}_{self.hemisphere}_fit2.func.gii"
+            file_name = f"{self.empirical_dir}/{self.subject_id}.fs_empirical_{self.retinotopic_map}_{self.hemisphere}_fit2.func.gii"
         elif map_type == 'empirical_split3':
-            file_name = f"surf/{self.subject_id}.fs_empirical_{self.retinotopic_map}_{self.hemisphere}_fit3.func.gii"
+            file_name = f"{self.empirical_dir}/{self.subject_id}.fs_empirical_{self.retinotopic_map}_{self.hemisphere}_fit3.func.gii"
         else:
             raise ValueError("Invalid map type specified.")
 
@@ -107,7 +137,8 @@ class RetinotopyData:
         """Transform the polar angle values in the empirical and predicted maps."""
         if self.retinotopic_map == 'polarAngle':
             self.empirical_map = self._transform_polarangle(self.empirical_map)
-            self.predicted_map = self._transform_polarangle(self.predicted_map)
+            if self.model not in MODELS_WITHOUT_POLARANGLE_TRANSFORM:
+                self.predicted_map = self._transform_polarangle(self.predicted_map)
             if self.split_half is not None:
                 self.empirical_map_split2 = self._transform_polarangle(self.empirical_map_split2)
                 self.empirical_map_split3 = self._transform_polarangle(self.empirical_map_split3)
