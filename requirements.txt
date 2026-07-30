@@ -14,6 +14,7 @@ kiwisolver==1.4.4
 lxml==4.9.2
 matplotlib==3.7.1
 mne @ git+https://github.com/mne-tools/mne-python.git@18b80903da84483325584d8dffe7c9f847f12b81
+neuropythy==0.12.16
 nibabel==5.1.0
 nilearn @ git+https://github.com/felenitaribeiro/nilearn.git@d3a678b13405a68b31d786e44ed2a218373636e0
 numpy==1.24.3
