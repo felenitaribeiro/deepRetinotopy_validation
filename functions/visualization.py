@@ -205,9 +205,11 @@ def retinotopic_map_plot(subject_id, path, template_path, prediction = 'predicte
     background[background > 0] = 1
 
     # Transformations
+    # Normalise legacy predictions to the natural polar angle convention. This is a no-op
+    # for the right hemisphere and for the visual coordinate models.
+    data.normalize_polarangle_convention()
+
     if hemisphere == 'lh':
-        if retinotopic_map == 'polarAngle':
-            data.apply_transform_polarangle()
         if prediction == 'empirical':
             data = data.empirical_map + threshold
         else:
@@ -217,8 +219,6 @@ def retinotopic_map_plot(subject_id, path, template_path, prediction = 'predicte
         data[final_mask_L != 1] = 0
 
     else:
-        # if retinotopic_map == 'polarAngle':
-        #     data.apply_transform_polarangle()
         if prediction == 'empirical':
             data = data.empirical_map + threshold
         else: 

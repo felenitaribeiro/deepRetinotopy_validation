@@ -19,9 +19,12 @@ VISUALCOORD_MODEL_TAGS = {
     'pRFsize': 'pRFsize',
 }
 
-# The visual coordinate models already predict left hemisphere polar angle in the
-# transformed convention, so only the empirical maps require the transformation.
-MODELS_WITHOUT_POLARANGLE_TRANSFORM = {'deepRetinotopy25_visualCoord'}
+# Every map loaded here is expected in the natural polar angle convention, i.e. the left
+# hemisphere covers the right visual field, from 270 (LVM) through 0/360 (HM) to 90 (UVM).
+# That is what the current toolbox release predicts and what the empirical maps are
+# generated in. The one exception is the left hemisphere prediction of the legacy models,
+# which were trained on labels shifted by 180 degrees, and is normalised on read.
+MODELS_WITH_SHIFTED_LH_POLARANGLE = {'deepRetinotopy25', 'deepRetinotopy21'}
 
 class RetinotopyData:
     def __init__(self, path, subject_id, hemisphere,
@@ -102,8 +105,10 @@ class RetinotopyData:
         return data[self.mask == 1]
     
     def _transform_polarangle(self, data):
-        """Transform polar angle values from the left hemisphere to the range from 0-90 degrees 
-        (UVF) and from 360-270 degrees (LVF).
+        """Shift left hemisphere polar angle values by 180 degrees, which maps between the
+        shifted convention of the legacy models and the natural convention, where the values
+        range from 0-90 degrees (UVF) and from 360-270 degrees (LVF). The shift is its own
+        inverse, so applying it twice restores the original values.
 
         Args:
             data (numpy array): Polar angle values
@@ -133,18 +138,28 @@ class RetinotopyData:
             self.empirical_map_split2 = self._apply_mask(self.empirical_map_split2)
             self.empirical_map_split3 = self._apply_mask(self.empirical_map_split3)
     
+    def normalize_polarangle_convention(self):
+        """Put the predicted map in the natural polar angle convention.
+
+        The empirical maps are generated in that convention, and so are the predictions of
+        the visual coordinate models, hence only the left hemisphere predictions of the
+        legacy models are shifted. Calling this for the right hemisphere, or for a map other
+        than polar angle, does nothing, so it is safe to call unconditionally.
+        """
+        if self.retinotopic_map != 'polarAngle' or self.hemisphere != 'lh':
+            return
+        if self.model in MODELS_WITH_SHIFTED_LH_POLARANGLE:
+            self.predicted_map = self._transform_polarangle(self.predicted_map)
+
     def apply_transform_polarangle(self):
-        """Transform the polar angle values in the empirical and predicted maps."""
-        if self.retinotopic_map == 'polarAngle':
-            self.empirical_map = self._transform_polarangle(self.empirical_map)
-            if self.model not in MODELS_WITHOUT_POLARANGLE_TRANSFORM:
-                self.predicted_map = self._transform_polarangle(self.predicted_map)
-            if self.split_half is not None:
-                self.empirical_map_split2 = self._transform_polarangle(self.empirical_map_split2)
-                self.empirical_map_split3 = self._transform_polarangle(self.empirical_map_split3)
-        else:
-            raise ValueError("Polar angle transformation is only applicable to this map.")
-    
+        """Removed: kept only to fail loudly instead of silently shifting maps twice."""
+        raise AttributeError(
+            "apply_transform_polarangle() has been removed. Empirical maps are no longer "
+            "shifted by 180 degrees, because they are now generated in the same convention "
+            "the current toolbox release predicts. Call normalize_polarangle_convention() "
+            "instead, which shifts only the left hemisphere predictions of the legacy models "
+            f"({sorted(MODELS_WITH_SHIFTED_LH_POLARANGLE)}).")
+
     def convert_to_radian(self):
         """Convert polar angle values in the empirical and predicted maps from degrees to radians."""
         if self.retinotopic_map == 'polarAngle' or self.retinotopic_map == 'eccentricity':
@@ -174,8 +189,8 @@ class RetinotopyData:
         background = self.binarize_curvature_map()
         threshold = 1  # threshold for the curvature map
 
-        if self.retinotopic_map == 'polarAngle': 
-            self.apply_transform_polarangle()
+        if self.retinotopic_map == 'polarAngle':
+            self.normalize_polarangle_convention()
             self.predicted_map = self.predicted_map + threshold
             self.empirical_map = self.empirical_map + threshold
             max_value = 360 + threshold
@@ -251,7 +266,11 @@ class RetinotopyData_logbar(RetinotopyData):
         self.number_hemi_nodes = number_hemi_nodes
         # Use the experiment parameter to differentiate logbar data
         self.experiment = experiment
-        
+        # _load_map below only knows the legacy prediction filenames, so the left hemisphere
+        # predictions are in the shifted convention and need normalising on read.
+        self.model = 'deepRetinotopy25'
+        self.split_half = None
+
         # Load maps during initialization
         self.predicted_map = self._load_map("predicted")
         self.empirical_map = self._load_map("empirical")
@@ -282,21 +301,6 @@ class RetinotopyData_logbar(RetinotopyData):
         self.empirical_map = self._apply_mask(self.empirical_map)
         self.variance_explained = self._apply_mask(self.variance_explained)
 
-    def apply_transform_polarangle(self):
-        """Transform the polar angle values in the empirical and predicted maps."""
-        if self.retinotopic_map == 'polarAngle':
-            self.empirical_map = self._transform_polarangle(self.empirical_map)
-            self.predicted_map = self._transform_polarangle(self.predicted_map)
-        else:
-            raise ValueError("Polar angle transformation is only applicable to this map.")
-        
-
-    def convert_to_radian(self):
-        """Convert polar angle values in the empirical and predicted maps from degrees to radians."""
-        if self.retinotopic_map == 'polarAngle' or self.retinotopic_map == 'eccentricity':
-            self.empirical_map = self._convert_to_radian(self.empirical_map)
-        else:
-            raise ValueError("Conversion to radians is only applicable to polar angle and eccentricity maps.")
 
 
 class RetinotopyData_training(RetinotopyData):
@@ -353,16 +357,14 @@ class RetinotopyData_training(RetinotopyData):
         self.empirical_map = self._apply_mask(self.empirical_map)
         self.variance_explained = self._apply_mask(self.variance_explained)
 
-    def apply_transform_polarangle(self):
-        """Transform the polar angle values in the empirical and predicted maps."""
-        if self.retinotopic_map == 'polarAngle':
-            self.empirical_map = self._transform_polarangle(self.empirical_map)
-        else:
-            raise ValueError("Polar angle transformation is only applicable to this map.")
-        
+    def normalize_polarangle_convention(self):
+        """No-op: this class loads empirical maps only, which are already in the natural
+        convention, and holds no predicted map to normalise."""
+        return
 
     def convert_to_radian(self):
-        """Convert polar angle values in the empirical and predicted maps from degrees to radians."""
+        """Convert polar angle values in the empirical map from degrees to radians. Only the
+        empirical map is converted because this class never loads a predicted map."""
         if self.retinotopic_map == 'polarAngle' or self.retinotopic_map == 'eccentricity':
             self.empirical_map = self._convert_to_radian(self.empirical_map)
         else:

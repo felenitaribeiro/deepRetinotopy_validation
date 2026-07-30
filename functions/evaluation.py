@@ -19,24 +19,6 @@ from scipy.stats import multivariate_normal
 from astropy.stats import circcorrcoef
 from astropy import units as u
 
-def transform_polarangle(data):
-        """Transform polar angle values from the left hemisphere to the range from 0-90 degrees 
-        (UVF) and from 360-270 degrees (LVF).
-
-        Args:
-            data (numpy array): Polar angle values
-
-        Returns:
-            data (numpy array): Transformed polar angle values
-        """
-        mask = data < 0
-        subtract = data > 180
-        add = data < 180
-        data[subtract] = data[subtract] - 180
-        data[add] = data[add] + 180
-        data[mask] = -1
-        return data
-
 def roi_earlyvisualcortex(list_of_labels):
     """Mask for the selection of the region of interest in the surface
     template.
@@ -221,8 +203,8 @@ def process_subjects(list_of_sub_ids, path, dataset_name, hemisphere, mask_final
             data = RetinotopyData(path, sub_id, hemisphere, retinotopic_map)
         data.apply_mask_to_maps(mask_final)
         apply_threshold(data, threshold)
-        if retinotopic_map == 'polarAngle' and hemisphere == 'lh':
-            data.apply_transform_polarangle()
+        # Normalise legacy predictions to the natural polar angle convention
+        data.normalize_polarangle_convention()
         if dataset_name == 'chn':
             second_mask = data.empirical_map > 0
             data.predicted_map = data.predicted_map[second_mask]
@@ -308,9 +290,8 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
                     data.apply_mask_to_maps(ROI_masked)
                     data.apply_mask_to_maps(mask)
 
-                    # # Transform polar angle values from lh
-                    if retinotopic_map == 'polarAngle' and hemisphere == 'lh':
-                        data.apply_transform_polarangle()
+                    # Normalise legacy predictions to the natural polar angle convention
+                    data.normalize_polarangle_convention()
 
                     assert np.min(data.predicted_map) >= 0.
                     assert np.min(data.empirical_map) >= 0.
@@ -349,10 +330,9 @@ def metric_model_selection(path, retinotopic_map, hemisphere, retinotopic_mappin
                     data_2.apply_mask_to_maps(ROI_masked)
                     data_2.apply_mask_to_maps(mask)
                     
-                    # Transform polar angle values from lh
-                    if retinotopic_map == 'polarAngle' and hemisphere == 'lh':
-                        data_1.apply_transform_polarangle()
-                        data_2.apply_transform_polarangle()
+                    # Normalise legacy predictions to the natural polar angle convention
+                    data_1.normalize_polarangle_convention()
+                    data_2.normalize_polarangle_convention()
                     assert np.min(data_1.predicted_map) >= 0.
                     assert np.min(data_2.predicted_map) >= 0.
                     
@@ -642,9 +622,8 @@ def explainedvariance_vs_error(path, retinotopic_map, hemisphere, threshold = 10
                     data.apply_mask_to_maps(ROI_masked)
                     data.apply_mask_to_maps(mask)
                     
-                    # Transform polar angle values from lh
-                    if retinotopic_map == 'polarAngle' and hemisphere == 'lh':
-                        data.apply_transform_polarangle()
+                    # Normalise legacy predictions to the natural polar angle convention
+                    data.normalize_polarangle_convention()
 
                     assert np.min(data.predicted_map) >= 0.
                     assert np.min(data.empirical_map) >= 0.
@@ -748,9 +727,8 @@ def explainedvariance_vs_error_across_datasets(path, dataset_name, experiment, r
                 data.apply_mask_to_maps(ROI_masked)
                 data.apply_mask_to_maps(mask)
                 
-                # Transform polar angle values from lh
-                if retinotopic_map == 'polarAngle' and hemisphere == 'lh':
-                    data.apply_transform_polarangle()
+                # Normalise legacy predictions to the natural polar angle convention
+                data.normalize_polarangle_convention()
 
                 # assert np.min(data.predicted_map) >= 0.
                 # assert np.min(data.empirical_map) >= 0.
