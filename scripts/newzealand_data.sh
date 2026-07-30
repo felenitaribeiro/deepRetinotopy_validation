@@ -77,7 +77,7 @@ do
                             from functions.preprocess import polarcoord; \
                             polarcoord('"$subject"/"$hemisphere"_"$experiment"_x0.gii', '"$subject"/"$hemisphere"_"$experiment"_y0.gii')"
                     
-                    echo "Tranforming polar angle data from lh..."
+                    echo "Converting polar angle data to the 0-360 range..."
                     python -c "import sys; sys.path.append('"$validationRepo"'); \
                         from functions.preprocess import transform_angle; \
                         transform_angle('"$subject"/"$hemisphere"_"$experiment"_angle_new.gii', '$hemisphere')"

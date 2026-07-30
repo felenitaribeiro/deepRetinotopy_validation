@@ -123,7 +123,7 @@ do
                                 from functions.preprocess import polarcoord; \
                                 polarcoord('"$dataDir"/"$projectDir"/derivatives/prf-estimation/"$subject"/prfs/"$subject"_ses-all_task-"$experiment"_hemi-"$hemi"_space-fsnative_prf/"$subject"_ses-all_task-"$experiment"_hemi-"$hemi"_space-fsnative_x0.gii', '"$dataDir"/"$projectDir"/derivatives/prf-estimation/"$subject"/prfs/"$subject"_ses-all_task-"$experiment"_hemi-"$hemi"_space-fsnative_prf/"$subject"_ses-all_task-"$experiment"_hemi-"$hemi"_space-fsnative_y0.gii')"
                         
-                        echo "Tranforming polar angle data from lh..."
+                        echo "Converting polar angle data to the 0-360 range..."
                         python -c "import sys; sys.path.append('"$validationRepo"'); \
                             from functions.preprocess import transform_angle; \
                             transform_angle('"$dataDir"/"$projectDir"/derivatives/prf-estimation/"$subject"/prfs/"$subject"_ses-all_task-"$experiment"_hemi-"$hemi"_space-fsnative_prf/"$subject"_ses-all_task-"$experiment"_hemi-"$hemi"_space-fsnative_angle_new.gii', '$hemisphere')"

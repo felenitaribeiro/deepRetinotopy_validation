@@ -112,7 +112,7 @@ do
                 mris_convert -c "$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/$subject/ses-nyu3t01/"$hemisphere"."$metric".mgz $subject/surf/"$hemisphere".white \
                     "$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/$subject/ses-nyu3t01/"$hemisphere"."$metric".gii \
                 
-                # Transform polar angle data before resampling
+                # Convert polar angle data from radians to the 0-360 degree range before resampling
                 echo "Resampling native data to fsaverage space..."
                 if [ $metric == "angle" ]; then
                     python -c "import sys; sys.path.append('"$validationRepo"/'); from functions.preprocess import transform_angle; transform_angle('"$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/$subject/ses-nyu3t01/"$hemisphere"."$metric".gii', '$hemisphere', radians = True)"

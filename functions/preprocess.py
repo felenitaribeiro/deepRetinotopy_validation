@@ -26,17 +26,20 @@ def polarcoord(x_data, y_data):
     return print('Data in cartesian coordinates transformed to polar coordinates')
 
 
-def transform_angle(path_to_empirical_data, hemisphere, radians = False, left_hemi_shift = True):
+def transform_angle(path_to_empirical_data, hemisphere, radians = False, left_hemi_shift = False):
     """
-    Transform the polar angle maps from -180 to 180 degrees where the origin in the positive x-axis, to 0 to 360 degrees where
-    the origin is the positive x-axis. The angles of the left hemisphere will be shifted by 180 degrees.
+    Transform the polar angle maps from -180 to 180 degrees, to 0 to 360 degrees, where the
+    origin is the positive x-axis in both cases. This leaves the maps in the natural
+    convention, in which the left hemisphere represents the right visual field, matching what
+    the toolbox predicts.
+
+    left_hemi_shift additionally shifts the left hemisphere by 180 degrees, which is the
+    convention the legacy models were trained on. It is only there to reproduce the empirical
+    maps as they used to be generated, and should be left off.
     """
     path_to_empirical_data = str(path_to_empirical_data)
-    if left_hemi_shift:
-        path_to_save = path_to_empirical_data[:-4] + '_transformed.gii'
-    else:
-        path_to_save = path_to_empirical_data[:-4] + '_0-360_transformed.gii'
-    
+    path_to_save = path_to_empirical_data[:-4] + '_transformed.gii'
+
     # Load the empirical data
     template = nib.load(path_to_empirical_data)
     data = template.agg_data()

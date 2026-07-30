@@ -113,7 +113,7 @@ do
                     "$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/"$data_folder"/"$subject"/"$hemisphere"."$metric".gii \
                 
                 echo "Resampling native data to fsaverage space..."
-                # Transform polar angle data before resampling
+                # Convert polar angle data from radians to the 0-360 degree range before resampling
                 if [ $metric == "angle" ]; then
                     python -c "import sys; sys.path.append('"$validationRepo"/'); from functions.preprocess import transform_angle; transform_angle('"$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/"$data_folder"/"$subject"/"$hemisphere"."$metric".gii', '$hemisphere', radians = True)"
                     wb_command -metric-resample "$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/"$data_folder"/"$subject"/"$hemisphere"."$metric"_transformed.gii \
