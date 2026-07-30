@@ -29,7 +29,7 @@ MODELS_WITH_SHIFTED_LH_POLARANGLE = {'deepRetinotopy25', 'deepRetinotopy21'}
 class RetinotopyData:
     def __init__(self, path, subject_id, hemisphere,
                  retinotopic_map, number_hemi_nodes=int(32492), model = 'deepRetinotopy25_visualCoord', model_index=None, split_half=None,
-                 empirical_dir='deepRetinotopy'):
+                 empirical_dir='surf'):
         self.path = path
         self.subject_id = subject_id
         self.hemisphere = hemisphere
