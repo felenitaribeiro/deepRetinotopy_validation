@@ -15,6 +15,23 @@ from matplotlib.colors import ListedColormap
 warnings.filterwarnings("ignore", category=DeprecationWarning) 
 warnings.filterwarnings("ignore", category=UserWarning) 
 
+
+def polarangle_colormap(hemisphere):
+    """Colormap for polar angle maps in the natural convention, one per hemisphere, such that
+    the same colours mark the same parts of the visual field in both hemispheres.
+
+    The left hemisphere (270 LVM, 0/360 HM, 90 UVM) uses gist_rainbow_r as is: upper
+    vertical meridian blue-violet, horizontal meridian red (the two ends of the colormap
+    meet there), lower vertical meridian yellow-green. The right hemisphere (90 UVM, 180 HM,
+    270 LVM) uses gist_rainbow_r mirrored about the horizontal meridian, so that every angle
+    gets the colour of the corresponding left hemisphere angle, (180 - angle) mod 360.
+    """
+    if hemisphere == 'lh':
+        return plt.get_cmap('gist_rainbow_r')
+    base = plt.get_cmap('gist_rainbow_r', 360)
+    colours = base(((180 - np.arange(360)) % 360) / 360)
+    return ListedColormap(colours, name='gist_rainbow_r_mirrored_rh')
+
 def roi(list_of_labels):
     """Mask for the selection of the region of interest in the surface
     template.
@@ -209,24 +226,14 @@ def retinotopic_map_plot(subject_id, path, template_path, prediction = 'predicte
     # for the right hemisphere and for the visual coordinate models.
     data.normalize_polarangle_convention()
 
-    if hemisphere == 'lh':
-        if prediction == 'empirical':
-            data = data.empirical_map + threshold
-        else:
-            data = data.predicted_map + threshold
-        if binarize:
-            data = discretize(data, retinotopic_map, hemisphere) + threshold
-        data[final_mask_L != 1] = 0
-
+    if prediction == 'empirical':
+        data = data.empirical_map + threshold
     else:
-        if prediction == 'empirical':
-            data = data.empirical_map + threshold
-        else: 
-            data = data.predicted_map + threshold
-            
-        if binarize:
-            data = discretize(data, retinotopic_map, hemisphere) + threshold
-        data[final_mask_R != 1] = 0
+        data = data.predicted_map + threshold
+    if binarize:
+        data = discretize(data, retinotopic_map, hemisphere) + threshold
+    data[final_mask_L != 1] = 0
+
 
     # Plotting
     if retinotopic_map == 'polarAngle':
@@ -239,12 +246,10 @@ def retinotopic_map_plot(subject_id, path, template_path, prediction = 'predicte
     colour = 'gist_rainbow_r'
     if hemisphere == 'lh':
         surface = osp.join(template_path,'fs_LR-deformed_to-fsaverage.L.sphere.32k_fs_LR.surf.gii')
-        colour = 'gist_rainbow_r'
-        # colour = cc.cm.CET_C1
     else:
         surface = osp.join(template_path,'fs_LR-deformed_to-fsaverage.R.sphere.32k_fs_LR.surf.gii')
-        if retinotopic_map == 'polarAngle':
-            colour = 'gist_rainbow'
+    if retinotopic_map == 'polarAngle':
+        colour = polarangle_colormap(hemisphere)
     view = plotting.view_surf(
         surf_mesh=surface,
         surf_map=np.reshape(data[0:32492], (-1)), bg_map=background,
