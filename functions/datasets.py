@@ -6,7 +6,7 @@ import sys
 
 sys.path.append(os.path.join(osp.dirname(osp.abspath(__file__)), '..'))
 
-from functions.visualization import roi, roi_earlyvisualcortex
+from functions.visualization import roi, roi_earlyvisualcortex, polarangle_colormap
 
 # Filename tags for the visual coordinate models. Polar angle and eccentricity are
 # derived from the model trained on visual coordinates (x, y), whereas pRF size is
@@ -69,14 +69,15 @@ class RetinotopyData:
                 if self.model_index is not None:
                     tag = f"{tag}-model{self.model_index}"
                 else:
-                    tag = f"{tag}-model1"
+                    tag = f"{tag}-model"
                 file_name = f"deepRetinotopy/{self.subject_id}.fs_predicted_{self.retinotopic_map}_{self.hemisphere}_curvatureFeat_{tag}.func.gii"
             elif self.model == 'deepRetinotopy21':
                 file_name = f"predicted_deepRetinotopy_21/{self.subject_id}.fs_predicted_{self.retinotopic_map}_{self.hemisphere}_curvatureMyelinFeat_model.func.gii"
             elif self.model == 'benson14':
                 file_name = f"surf/{self.hemisphere}.benson14_{self.retinotopic_map}.func.gii"
             elif self.model == 'noise_ceiling':
-                file_name = f"deepRetinotopy/{self.subject_id}.fs_predicted_{self.retinotopic_map}_{self.hemisphere}_curvatureFeat_model.func.gii" # This won't be used
+                tag = VISUALCOORD_MODEL_TAGS[self.retinotopic_map]
+                file_name = f"deepRetinotopy/{self.subject_id}.fs_predicted_{self.retinotopic_map}_{self.hemisphere}_curvatureFeat_{tag}-model.func.gii" # This won't be used
         elif map_type == 'empirical':
             file_name = f"{self.empirical_dir}/{self.subject_id}.fs_empirical_{self.retinotopic_map}_{self.hemisphere}.func.gii"
         elif map_type == 'variance_explained':
@@ -234,11 +235,11 @@ class RetinotopyData:
         colour = 'gist_rainbow_r'  # Default colormap
         if self.hemisphere == 'lh':
             surface = osp.join(surface_template_path,'fs_LR-deformed_to-fsaverage.L.sphere.32k_fs_LR.surf.gii')
-            colour = 'gist_rainbow_r'
         elif self.hemisphere == 'rh':
             surface = osp.join(surface_template_path,'fs_LR-deformed_to-fsaverage.R.sphere.32k_fs_LR.surf.gii')
-            if self.retinotopic_map == 'polarAngle':
-                colour = 'gist_rainbow'
+        if self.retinotopic_map == 'polarAngle':
+            # Same colours for the same parts of the visual field in both hemispheres
+            colour = polarangle_colormap(self.hemisphere)
 
         view = plotting.view_surf(
             surf_mesh=surface,
@@ -246,7 +247,7 @@ class RetinotopyData:
             cmap=colour, black_bg=False, symmetric_cmap=False,
             threshold=threshold, vmax=max_value)
         if save_html:
-            save_path = os.path.join(osp.dirname(osp.abspath(__file__)), '..', 'output/benchmarking/maps')
+            save_path = os.path.join(osp.dirname(osp.abspath(__file__)), '..', 'output_revision/benchmarking/maps')
             if not osp.exists(save_path):
                 os.makedirs(save_path) 
             if plot_type == 'predicted':
