@@ -14,7 +14,10 @@ The script performs three main steps:
 Usage:
     python vf_analysis_script.py --config config.yaml
     or
-    python vf_analysis_script.py --freesurfer_dir /path/to/freesurfer --template_dir /path/to/templates --hcp_dir /path/to/hcp --output_file results.csv
+    python vf_analysis_script.py --freesurfer_dir /path/to/freesurfer --template_dir /path/to/templates --hcp_dir /path/to/hcp --output_dir /path/to/output --dataset_name 7THCP_Retinotopy
+
+The results are written to <output_dir>/surface_area_results_<dataset_name>_w<wedge_size>.csv, the same
+name the validation notebook (4_surface-area.ipynb) uses.
 
 Requirements:
     - nibabel
@@ -301,9 +304,51 @@ def compute_surface_area(vertices: np.ndarray, faces: np.ndarray, mask: np.ndarr
     return np.sum(areas[valid_faces])
 
 
+def keep_largest_component(mask: np.ndarray, faces: np.ndarray) -> np.ndarray:
+    """
+    Keep only the largest connected component of a vertex mask on the mesh.
+
+    Predicted eccentricity is not strictly monotonic at the anterior edge of V1: it
+    rises past the eccentricity threshold and then falls back below it, so vertices
+    there re-enter the wedge mask as small islands detached from the wedge proper.
+    Two vertices are connected when they share an edge of a face and both are in
+    the mask. Uses pure numpy (min-label propagation) so it runs in the container
+    without scipy.
+
+    Parameters:
+    -----------
+    mask : np.ndarray
+        Boolean vertex mask
+    faces : np.ndarray
+        Array of triangle face indices
+
+    Returns:
+    --------
+    np.ndarray
+        Boolean mask restricted to its largest connected component
+    """
+    mask = np.asarray(mask, dtype=bool)
+    masked = np.flatnonzero(mask)
+    if masked.size == 0:
+        return mask
+    in_mask = mask[faces]
+    edges = np.concatenate([faces[in_mask[:, a] & in_mask[:, b]][:, [a, b]]
+                            for a, b in ((0, 1), (1, 2), (2, 0))])
+    labels = np.arange(mask.size)
+    while True:
+        new_labels = labels.copy()
+        np.minimum.at(new_labels, edges[:, 0], labels[edges[:, 1]])
+        np.minimum.at(new_labels, edges[:, 1], labels[edges[:, 0]])
+        if np.array_equal(new_labels, labels):
+            break
+        labels = new_labels
+    largest = np.bincount(labels[masked]).argmax()
+    return mask & (labels == largest)
+
+
 def generate_masks(freesurfer_directory: str, subject_id: str, hemisphere: str, 
-                  retinotopic_mapping: str = 'deepRetinotopy', group: str = 'all',
-                  wedge_size: int = 35) -> Tuple[np.ndarray, ...]:
+                  retinotopic_mapping: str = 'deepRetinotopy',
+                  wedge_size: int = 35, faces: Optional[np.ndarray] = None) -> Tuple[np.ndarray, ...]:
     """
     Generate masks for wedges of specified size.
     
@@ -319,6 +364,10 @@ def generate_masks(freesurfer_directory: str, subject_id: str, hemisphere: str,
         Type of retinotopic mapping ('deepRetinotopy')
     wedge_size : int
         Size of visual field wedge in degrees
+    faces : np.ndarray, optional
+        Triangle faces of the native surface. When given, each wedge mask is
+        reduced to its largest connected component (see keep_largest_component).
+        The two horizontal halves form a single wedge and are filtered together
         
     Returns:
     --------
@@ -329,8 +378,8 @@ def generate_masks(freesurfer_directory: str, subject_id: str, hemisphere: str,
     
     # Load retinotopic maps based on mapping type
     if retinotopic_mapping == 'deepRetinotopy':
-        polar_angle = nib.load(f'{freesurfer_directory}/{subject_id}/deepRetinotopy/{subject_id}.predicted_polarAngle_model.{hemisphere}.native.func.gii').darrays[0].data
-        eccentricity = nib.load(f'{freesurfer_directory}/{subject_id}/deepRetinotopy/{subject_id}.predicted_eccentricity_model.{hemisphere}.native.func.gii').darrays[0].data
+        polar_angle = nib.load(f'{freesurfer_directory}/{subject_id}/deepRetinotopy/{subject_id}.predicted_polarAngle_visualCoord-model.{hemisphere}.native.func.gii').darrays[0].data
+        eccentricity = nib.load(f'{freesurfer_directory}/{subject_id}/deepRetinotopy/{subject_id}.predicted_eccentricity_visualCoord-model.{hemisphere}.native.func.gii').darrays[0].data
     elif retinotopic_mapping == 'empirical':
         polar_angle = nib.load(f'{freesurfer_directory}/{subject_id}/deepRetinotopy/{subject_id}.empirical_polarAngle.{hemisphere}.native.func.gii').darrays[0].data
         eccentricity = nib.load(f'{freesurfer_directory}/{subject_id}/deepRetinotopy/{subject_id}.empirical_eccentricity.{hemisphere}.native.func.gii').darrays[0].data
@@ -374,13 +423,21 @@ def generate_masks(freesurfer_directory: str, subject_id: str, hemisphere: str,
     horizontal_lower_mask = horizontal_lower_vf_mask & valid_data
     horizontal_upper_mask = horizontal_upper_vf_mask & valid_data
 
+    # Drop islands detached from the wedge (non-monotonic eccentricity at the V1 edge)
+    if faces is not None:
+        upper_vm_mask = keep_largest_component(upper_vm_mask, faces)
+        lower_vm_mask = keep_largest_component(lower_vm_mask, faces)
+        # the two horizontal halves are one wedge: filter their union, then split again
+        horizontal_mask = keep_largest_component(horizontal_lower_mask | horizontal_upper_mask, faces)
+        horizontal_lower_mask = horizontal_lower_mask & horizontal_mask
+        horizontal_upper_mask = horizontal_upper_mask & horizontal_mask
+
     return upper_vm_mask, lower_vm_mask, horizontal_lower_mask, horizontal_upper_mask, polar_angle, v1_roi
 
 
 def analyze_subject_vf_areas(freesurfer_directory: str, subject: str, 
                            retinotopic_mapping: str = 'deepRetinotopy', 
                            wedge_size: int = 35, 
-                           group: str = 'all',
                            hemispheres: str = 'both') -> Dict:
     """
     Analyze visual field areas for one subject across hemispheres.
@@ -425,26 +482,27 @@ def analyze_subject_vf_areas(freesurfer_directory: str, subject: str,
         faces = surface.darrays[1].data     # triangle faces
 
         upper_vm_mask, lower_vm_mask, horizontal_l_mask, horizontal_u_mask, _, v1_roi = generate_masks(
-            freesurfer_directory, subject, hemisphere, retinotopic_mapping, group,
-            wedge_size=wedge_size)
+            freesurfer_directory, subject, hemisphere, retinotopic_mapping, 
+            wedge_size=wedge_size, faces=faces)
 
         # Calculate surface areas
         upper_area_hemi = compute_surface_area(vertices, faces, upper_vm_mask)
         lower_area_hemi = compute_surface_area(vertices, faces, lower_vm_mask)
-        horizontal_upper_hemi = compute_surface_area(vertices, faces, horizontal_u_mask)
-        horizontal_lower_hemi = compute_surface_area(vertices, faces, horizontal_l_mask)
+        # Horizontal wedge as one region: summing the two halves separately would drop every
+        # triangle straddling the horizontal meridian line (a strip along the whole meridian)
+        horizontal_area_hemi = compute_surface_area(vertices, faces, horizontal_l_mask | horizontal_u_mask)
         v1_area_hemi = compute_surface_area(vertices, faces, v1_roi)
         
         # Save hemisphere-specific data
         if hemisphere == 'lh':
-            left_horizontal_area = horizontal_lower_hemi + horizontal_upper_hemi
+            left_horizontal_area = horizontal_area_hemi
         elif hemisphere == 'rh':
-            right_horizontal_area = horizontal_lower_hemi + horizontal_upper_hemi
+            right_horizontal_area = horizontal_area_hemi
 
         # Add to totals
         total_upper_area += upper_area_hemi / 2  # divide by 2 to account for V1 and V2
         total_lower_area += lower_area_hemi / 2  # divide by 2 to account for V1 and V2
-        total_horizontal_area += horizontal_lower_hemi + horizontal_upper_hemi
+        total_horizontal_area += horizontal_area_hemi
         total_v1_area += v1_area_hemi
 
     # Calculate derived metrics
@@ -539,24 +597,22 @@ def main():
         epilog="""
 Example usage:
     # Basic usage:
-    python vf_analysis_script.py --freesurfer_dir /path/to/freesurfer --template_dir /path/to/templates --hcp_dir /path/to/hcp --output_file results.csv
+    python vf_analysis_script.py --freesurfer_dir /path/to/freesurfer --template_dir /path/to/templates --hcp_dir /path/to/hcp --output_dir /path/to/output --dataset_name 7THCP_Retinotopy
 
-    # Analyzing multiple methods and groups (space-separated):
-    python vf_analysis_script.py --freesurfer_dir /path/to/freesurfer --methods deepRetinotopy empirical --groups adults children --output_file results.csv
-
-    # Or using repeated flags:
-    python vf_analysis_script.py --freesurfer_dir /path/to/freesurfer --methods deepRetinotopy --methods empirical --groups adults --groups children
+    # Analyzing several methods (space-separated) and naming the dataset written to the results:
+    python vf_analysis_script.py --freesurfer_dir /path/to/freesurfer --methods deepRetinotopy empirical --dataset_name 7THCP_Retinotopy --output_dir /path/to/output
         """)
     
     parser.add_argument('--freesurfer_dir', type=str, required=True, help='Path to FreeSurfer derivatives directory')
     parser.add_argument('--template_dir', type=str, required=True, help='Path to ROI template directory')
     parser.add_argument('--hcp_dir', type=str, required=True, help='Path to HCP template directory')
-    parser.add_argument('--output_file', type=str, default='vf_analysis_results.csv', help='Output CSV file')
+    parser.add_argument('--output_dir', type=str, required=True,
+                       help='Directory for the results; the file is named surface_area_results_<dataset_name>_w<wedge_size>.csv as in the notebook')
     parser.add_argument('--wedge_size', type=int, default=45, help='Visual field wedge size in degrees')
     parser.add_argument('--methods', nargs='+', default=['deepRetinotopy'], 
                        help='Retinotopic mapping methods to analyze')
-    parser.add_argument('--groups', nargs='+', default=['all'],
-                       help='Groups to analyze (e.g., adults children). Use "all" for no group separation')
+    parser.add_argument('--dataset_name', type=str, required=True,
+                       help='Dataset name written to the results (e.g., 7THCP_Retinotopy, HCP-1200, ABCD)')
     parser.add_argument('--n_jobs', type=int, help='Number of parallel processes for resampling (default: all CPUs)')
     parser.add_argument('--skip_resampling', action='store_true', help='Skip ROI resampling step')
     parser.add_argument('--subjects', nargs='+', help='Specific subjects to analyze (optional)')
@@ -582,8 +638,9 @@ Example usage:
     
     print("Starting visual field surface area analysis...")
     print(f"FreeSurfer directory: {args.freesurfer_dir}")
-    print(f"Output file: {args.output_file}")
+    print(f"Output directory: {args.output_dir}")
     print(f"Methods: {args.methods}")
+    print(f"Dataset name: {args.dataset_name}")
     print(f"Wedge size: {args.wedge_size} degrees")
     
     # Get subjects
@@ -636,41 +693,43 @@ Example usage:
     print("\nStep 2: Analyzing surface areas...")
     results = []
     
-    total_analyses = len(args.methods) * len(args.groups) * len(subjects)
+    total_analyses = len(args.methods) * len(subjects)
     current_analysis = 0
     
     for retinotopic_mapping in args.methods:
-        for group in args.groups:
-            for subject in subjects:
-                current_analysis += 1
-                print(f"Analyzing {subject} with {retinotopic_mapping} (group: {group}) ({current_analysis}/{total_analyses})")
+        for subject in subjects:
+            current_analysis += 1
+            print(f"Analyzing {subject} with {retinotopic_mapping} (dataset: {args.dataset_name}) ({current_analysis}/{total_analyses})")
+            
+            try:
+                result = analyze_subject_vf_areas(
+                    args.freesurfer_dir, subject,
+                    retinotopic_mapping=retinotopic_mapping,
+                    wedge_size=args.wedge_size)
+                result['method'] = retinotopic_mapping
+                result['dataset_name'] = args.dataset_name
                 
-                try:
-                    result = analyze_subject_vf_areas(
-                        args.freesurfer_dir, subject,
-                        retinotopic_mapping=retinotopic_mapping,
-                        group=group,
-                        wedge_size=args.wedge_size)
-                    result['method'] = retinotopic_mapping
-                    result['group'] = group
-                    
-                    # Extract age from subject ID if possible
-                    try:
-                        result['age'] = int(subject[-2:])
-                    except (ValueError, IndexError):
-                        result['age'] = 'N/A'
-                    
-                    results.append(result)
+                # Age from the subject ID, only for the Stanford naming (sub-<initials><age>); numeric IDs get N/A
+                stem = subject.replace('sub-', '')
+                if stem[:-2].isalpha() and stem[-2:].isdigit():
+                    result['age'] = int(stem[-2:])
+                else:
+                    result['age'] = 'N/A'
                 
-                except Exception as e:
-                    print(f"Error processing {subject} with {retinotopic_mapping} (group: {group}): {e}")
+                results.append(result)
+            
+            except Exception as e:
+                print(f"Error processing {subject} with {retinotopic_mapping} (dataset: {args.dataset_name}): {e}")
     
     # Step 3: Save results
-    print(f"\nStep 3: Saving {len(results)} results to {args.output_file}...")
-    save_results_to_csv(results, args.output_file)
+    # Same file name as the validation notebook, so both outputs can be used interchangeably
+    os.makedirs(args.output_dir, exist_ok=True)
+    output_file = os.path.join(args.output_dir, f"surface_area_results_{args.dataset_name}_w{args.wedge_size}.csv")
+    print(f"\nStep 3: Saving {len(results)} results to {output_file}...")
+    save_results_to_csv(results, output_file)
     
     print("Analysis complete!")
-    print(f"Results saved to: {args.output_file}")
+    print(f"Results saved to: {output_file}")
     
     # Calculate summary statistics
     unique_subjects = set(r['subject'] for r in results)
