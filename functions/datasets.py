@@ -24,7 +24,7 @@ VISUALCOORD_MODEL_TAGS = {
 # That is what the current toolbox release predicts and what the empirical maps are
 # generated in. The one exception is the left hemisphere prediction of the legacy models,
 # which were trained on labels shifted by 180 degrees, and is normalised on read.
-MODELS_WITH_SHIFTED_LH_POLARANGLE = {'deepRetinotopy25', 'deepRetinotopy21'}
+MODELS_WITH_SHIFTED_LH_POLARANGLE = {'deepRetinotopy25'} # legacy
 
 class RetinotopyData:
     def __init__(self, path, subject_id, hemisphere,
@@ -72,7 +72,11 @@ class RetinotopyData:
                     tag = f"{tag}-model"
                 file_name = f"deepRetinotopy/{self.subject_id}.fs_predicted_{self.retinotopic_map}_{self.hemisphere}_curvatureFeat_{tag}.func.gii"
             elif self.model == 'deepRetinotopy21':
-                file_name = f"predicted_deepRetinotopy_21/{self.subject_id}.fs_predicted_{self.retinotopic_map}_{self.hemisphere}_curvatureMyelinFeat_model.func.gii"
+                if self.retinotopic_map == 'polarAngle' and self.hemisphere == 'lh':
+                    tag = f"{self.retinotopic_map}-model_transformed"
+                else:
+                    tag = f"{self.retinotopic_map}-model"
+                file_name = f"deepretinotopy21/{self.subject_id}.fs_predicted_{self.retinotopic_map}_{self.hemisphere}_myelincurvFeat_{tag}.func.gii"
             elif self.model == 'benson14':
                 file_name = f"surf/{self.hemisphere}.benson14_{self.retinotopic_map}.func.gii"
             elif self.model == 'noise_ceiling':
