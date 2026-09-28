@@ -1,26 +1,27 @@
 #!/usr/bin/env bash
 ml connectomeworkbench/1.5.0
 ml freesurfer/7.3.2
-ml deepretinotopy/1.0.11
+ml deepretinotopy/1.0.19
 
 source ~/miniforge3/etc/profile.d/conda.sh
 conda activate deepretinotopy_validation
 
-while getopts d:t:r: flag
+while getopts d:t:r:o: flag
 do
     case "${flag}" in
-        d) dataDir=${OPTARG};;
+        d) dataDir=$(realpath -m "${OPTARG}");;   # resolved, since the script changes directory before using it
         t) dirHCP=$(realpath "${OPTARG}");;
-        r) validationRepo=${OPTARG};;
+        r) validationRepo=$(realpath "${OPTARG}");;
+        o) outputDir=$(realpath -m "${OPTARG}");;
 	?)
-		echo "script usage: $(basename "$0") [-d path to datasets directory] [-t path to directory with HCP template surfaces] [-r path to deepRetinotopy_validation repo]" >&2
+		echo "script usage: $(basename "$0") [-d path to datasets directory] [-t path to directory with HCP template surfaces] [-r path to deepRetinotopy_validation repo] [-o path to output directory]" >&2
 		exit 1
 	esac
 done
 
 # Tests for paths arguments
-if [ -z "$dataDir" ] || [ -z "$dirHCP" ] || [ -z "$validationRepo" ]; then
-    echo "Usage: $(basename "$0") [-d path to datasets directory] [-t path to directory with HCP template surfaces] [-r path to deepRetinotopy_validation repo]"
+if [ -z "$dataDir" ] || [ -z "$dirHCP" ] || [ -z "$validationRepo" ] || [ -z "$outputDir" ]; then
+    echo "Usage: $(basename "$0") [-d path to datasets directory] [-t path to directory with HCP template surfaces] [-r path to deepRetinotopy_validation repo] [-o path to output directory]"
     exit 1
 fi
 
@@ -31,7 +32,7 @@ cd "$dataDir"/"$projectDir"/
 echo "--------------------------------------------------------------------------------"
 echo "[Step 1] Run deepRetinotopy..."
 echo "--------------------------------------------------------------------------------"
-deepRetinotopy -s "$dataDir"/"$projectDir"/ -t $dirHCP -d kiwi -m "polarAngle,eccentricity,pRFsize"
+deepRetinotopy -s "$dataDir"/"$projectDir"/ -t $dirHCP -d kiwi -m "polarAngle,eccentricity,pRFsize" -j 64 -o "$outputDir"
 
 # Convert the retinotopy data to .gii format in the fs_32k space
 echo "--------------------------------------------------------------------------------"
@@ -40,6 +41,13 @@ echo "--------------------------------------------------------------------------
 cd "$dataDir"/"$projectDir"/
 for subject in `ls .`;
 do
+    # Skip anything that is not a subject directory (for example logs/)
+    if [ ! -d "$subject"/surf ]; then
+        continue
+    fi
+    # Surfaces written by deepRetinotopy in Step 1 (same path as the -o passed above), so that the
+    # empirical and predicted maps are resampled with the same template sphere and area surfaces
+    surfDir="$outputDir"/"$subject"/surf
     for hemisphere in lh rh;
     do
         if [ $hemisphere == "lh" ]; then
@@ -48,6 +56,8 @@ do
             hemi="R"
         fi
 
+        # Polar angle and eccentricity are reconstructed from the resampled x0/y0 maps below (metric y0),
+        # so that the 0/360 wrap of the angle is never interpolated
         for metric in x0 y0 sigma r^2;
         do  
             if [ $metric == "sigma" ]; then
@@ -66,52 +76,18 @@ do
                 
                 echo "Resampling $metric data..."
                 wb_command -metric-resample "$subject"/"$hemisphere"_"$experiment"_"$metric".gii \
-                        $subject/surf/"$hemisphere".sphere.reg.surf.gii "$dirHCP"/fs_LR-deformed_to-fsaverage."$hemi".sphere.32k_fs_LR.surf.gii \
-                        ADAP_BARY_AREA $subject/surf/"$subject".fs_empirical_"$metric_new"_"$experiment"_"$hemisphere".func.gii \
-                        -area-surfs $subject/surf/"$hemisphere".midthickness.surf.gii $subject/surf/"$subject"."$hemisphere".midthickness.32k_fs_LR.surf.gii   
+                        "$surfDir"/"$hemisphere".sphere.reg.surf.gii "$dirHCP"/fs_LR-deformed_to-fsaverage."$hemi".sphere.32k_fs_LR.surf.gii \
+                        ADAP_BARY_AREA $surfDir/"$subject".fs_empirical_"$metric_new"_"$experiment"_"$hemisphere".func.gii \
+                        -area-surfs "$surfDir"/"$hemisphere".midthickness.surf.gii "$surfDir"/"$subject"."$hemisphere".midthickness.32k_fs_LR.surf.gii   
             
 
-                if [ $metric == "y0" ] && [ $hemisphere == "lh" ]; then
-                    echo "Generate polar angle and eccentricity data..."
-                    python -c "import sys; sys.path.append('"$validationRepo"'); \
-                            from functions.preprocess import polarcoord; \
-                            polarcoord('"$subject"/"$hemisphere"_"$experiment"_x0.gii', '"$subject"/"$hemisphere"_"$experiment"_y0.gii')"
-                    
-                    echo "Converting polar angle data to the 0-360 range..."
-                    python -c "import sys; sys.path.append('"$validationRepo"'); \
-                        from functions.preprocess import transform_angle; \
-                        transform_angle('"$subject"/"$hemisphere"_"$experiment"_angle_new.gii', '$hemisphere')"
-
-                    echo "Resampling polar angle data..."
-                    wb_command -metric-resample "$subject"/"$hemisphere"_"$experiment"_angle_new_transformed.gii \
-                        $subject/surf/"$hemisphere".sphere.reg.surf.gii "$dirHCP"/fs_LR-deformed_to-fsaverage."$hemi".sphere.32k_fs_LR.surf.gii \
-                        ADAP_BARY_AREA $subject/surf/"$subject".fs_empirical_polarAngle_"$experiment"_"$hemisphere".func.gii \
-                        -area-surfs $subject/surf/"$hemisphere".midthickness.surf.gii $subject/surf/"$subject"."$hemisphere".midthickness.32k_fs_LR.surf.gii   
-
-                    echo "Resampling eccentricity data..."
-                    wb_command -metric-resample "$subject"/"$hemisphere"_"$experiment"_eccen_new.gii \
-                        $subject/surf/"$hemisphere".sphere.reg.surf.gii "$dirHCP"/fs_LR-deformed_to-fsaverage."$hemi".sphere.32k_fs_LR.surf.gii \
-                        ADAP_BARY_AREA $subject/surf/"$subject".fs_empirical_eccentricity_"$experiment"_"$hemisphere".func.gii \
-                        -area-surfs $subject/surf/"$hemisphere".midthickness.surf.gii $subject/surf/"$subject"."$hemisphere".midthickness.32k_fs_LR.surf.gii
-                        
-                elif [ $metric == "y0" ] && [ $hemisphere == "rh" ]; then
-                    echo "Generate polar angle and eccentricity data..."
-                    python -c "import sys; sys.path.append('"$validationRepo"'); \
-                            from functions.preprocess import polarcoord; \
-                            polarcoord('"$subject"/"$hemisphere"_"$experiment"_x0.gii',
-                                '"$subject"/"$hemisphere"_"$experiment"_y0.gii')"
-
-                    echo "Resampling polar angle data..."
-                    wb_command -metric-resample "$subject"/"$hemisphere"_"$experiment"_angle_new.gii \
-                        $subject/surf/"$hemisphere".sphere.reg.surf.gii "$dirHCP"/fs_LR-deformed_to-fsaverage."$hemi".sphere.32k_fs_LR.surf.gii \
-                        ADAP_BARY_AREA $subject/surf/"$subject".fs_empirical_polarAngle_"$experiment"_"$hemisphere".func.gii \
-                        -area-surfs $subject/surf/"$hemisphere".midthickness.surf.gii $subject/surf/"$subject"."$hemisphere".midthickness.32k_fs_LR.surf.gii   
-
-                    echo "Resampling eccentricity data..."
-                    wb_command -metric-resample "$subject"/"$hemisphere"_"$experiment"_eccen_new.gii \
-                        $subject/surf/"$hemisphere".sphere.reg.surf.gii "$dirHCP"/fs_LR-deformed_to-fsaverage."$hemi".sphere.32k_fs_LR.surf.gii \
-                        ADAP_BARY_AREA $subject/surf/"$subject".fs_empirical_eccentricity_"$experiment"_"$hemisphere".func.gii \
-                        -area-surfs $subject/surf/"$hemisphere".midthickness.surf.gii $subject/surf/"$subject"."$hemisphere".midthickness.32k_fs_LR.surf.gii
+                if [ $metric == "y0" ]; then
+                    echo "Reconstructing polar angle and eccentricity from the resampled x0/y0 maps..."
+                    reconstruct_coords_native.py \
+                                --x $surfDir/"$subject".fs_empirical_x0_"$experiment"_"$hemisphere".func.gii \
+                                --y $surfDir/"$subject".fs_empirical_y0_"$experiment"_"$hemisphere".func.gii \
+                                --polarangle $surfDir/"$subject".fs_empirical_polarAngle_"$experiment"_"$hemisphere".func.gii \
+                                --eccentricity $surfDir/"$subject".fs_empirical_eccentricity_"$experiment"_"$hemisphere".func.gii
                 fi
             done
         done

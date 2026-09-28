@@ -1,26 +1,27 @@
 #!/usr/bin/env bash
 ml connectomeworkbench/1.5.0
 ml freesurfer/7.3.2
-ml deepretinotopy/1.0.11
+ml deepretinotopy/1.0.19
 
 source ~/miniforge3/etc/profile.d/conda.sh
 conda activate deepretinotopy_validation
 
-while getopts d:t:r: flag
+while getopts d:t:r:o: flag
 do
     case "${flag}" in
-        d) dataDir=${OPTARG};;
+        d) dataDir=$(realpath -m "${OPTARG}");;   # resolved, since the script changes directory before using it
         t) dirHCP=$(realpath "${OPTARG}");;
-        r) validationRepo=${OPTARG};;
+        r) validationRepo=$(realpath "${OPTARG}");;
+        o) outputDir=$(realpath -m "${OPTARG}");;
 	?)
-		echo "script usage: $(basename "$0") [-d path to datasets directory] [-t path to directory with HCP template surfaces] [-r path to deepRetinotopy_validation repo]" >&2
+		echo "script usage: $(basename "$0") [-d path to datasets directory] [-t path to directory with HCP template surfaces] [-r path to deepRetinotopy_validation repo] [-o path to output directory]" >&2
 		exit 1
 	esac
 done
 
 # Tests for paths arguments
-if [ -z "$dataDir" ] || [ -z "$dirHCP" ] || [ -z "$validationRepo" ]; then
-    echo "Usage: $(basename "$0") [-d path to datasets directory] [-t path to directory with HCP template surfaces] [-r path to deepRetinotopy_validation repo]"
+if [ -z "$dataDir" ] || [ -z "$dirHCP" ] || [ -z "$validationRepo" ] || [ -z "$outputDir" ]; then
+    echo "Usage: $(basename "$0") [-d path to datasets directory] [-t path to directory with HCP template surfaces] [-r path to deepRetinotopy_validation repo] [-o path to output directory]"
     exit 1
 fi
 
@@ -29,7 +30,19 @@ projectDir=${projectURL:37:-4} # after slash before .git
 cd $dataDir
 echo `pwd $dataDir`
 
+# git refuses to operate on a repository that appears to be owned by another user, which is the
+# case on network shares that squash ownership, and then every datalad call fails silently. Mark
+# the dataset location as safe once (the entry goes to the global git config)
+if ! git config --global --get-all safe.directory | grep -qxF "$dataDir"/"$projectDir"; then
+    git config --global --add safe.directory "$dataDir"/"$projectDir"
+fi
+
 datalad install $projectURL
+
+# On the first "datalad get", git-annex probes the GitHub remote for file content, which fails
+# and costs that first file (it only marks the remote as annex-ignore afterwards). Record it
+# upfront so that every file is fetched from the S3 remote, including the first one
+git -C "$dataDir"/"$projectDir" config remote.origin.annex-ignore true
 
 # Dataset download
 echo "--------------------------------------------------------------------------------"
@@ -64,8 +77,8 @@ do
     fi
 done
 # prf estimates
-datalad get "$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/"$data_folder"/children/*
-datalad get "$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/"$data_folder"/adults/*
+datalad get "$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/children/*
+datalad get "$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/adults/*
 
 cd "$dataDir"/"$projectDir"/
 datalad unlock .
@@ -74,8 +87,7 @@ datalad unlock .
 echo "--------------------------------------------------------------------------------"
 echo "[Step 2] Run deepRetinotopy..."
 echo "--------------------------------------------------------------------------------"
-deepRetinotopy -s "$dataDir"/"$projectDir"/derivatives/freesurfer -t $dirHCP -d stanford -m "polarAngle,eccentricity,pRFsize"
-
+deepRetinotopy -s "$dataDir"/"$projectDir"/derivatives/freesurfer -t $dirHCP -d stanford -m "polarAngle,eccentricity,pRFsize" -j 64 -o "$outputDir"
 
 # Convert the retinotopy data to .gii format in the fs_32k space
 echo "--------------------------------------------------------------------------------"
@@ -89,13 +101,11 @@ do
     else
         hemi="R"
     fi
-    for metric in eccen sigma vexpl angle;
+    # Polar angle and eccentricity are not resampled themselves: they are reconstructed from the
+    # resampled x/y maps below, so that the 0/360 wrap of the angle is never interpolated
+    for metric in sigma vexpl x y;
     do
-        if [ $metric == "angle" ]; then
-            metric_new="polarAngle"
-        elif [ $metric == "eccen" ]; then
-            metric_new="eccentricity"
-        elif [ $metric == "sigma" ]; then
+        if [ $metric == "sigma" ]; then
             metric_new="pRFsize"
         elif [ $metric == "vexpl" ]; then
             metric_new="variance_explained"
@@ -109,23 +119,25 @@ do
         for data_folder in adults children; do
             cd "$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/"$data_folder"/
             for subject in `ls .`; do
+                # Surfaces written by deepRetinotopy in Step 2 (same path as the -o passed above), so that the
+                # empirical and predicted maps are resampled with the same template sphere and area surfaces
+                surfDir="$outputDir"/"$subject"/surf
                 mris_convert -c "$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/"$data_folder"/"$subject"/"$hemisphere"."$metric".mgz "$dataDir"/"$projectDir"/derivatives/freesurfer/"$subject"/surf/"$hemisphere".white \
                     "$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/"$data_folder"/"$subject"/"$hemisphere"."$metric".gii \
                 
                 echo "Resampling native data to fsaverage space..."
-                # Convert polar angle data from radians to the 0-360 degree range before resampling
-                if [ $metric == "angle" ]; then
-                    python -c "import sys; sys.path.append('"$validationRepo"/'); from functions.preprocess import transform_angle; transform_angle('"$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/"$data_folder"/"$subject"/"$hemisphere"."$metric".gii', '$hemisphere', radians = True)"
-                    wb_command -metric-resample "$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/"$data_folder"/"$subject"/"$hemisphere"."$metric"_transformed.gii \
-                        "$dataDir"/"$projectDir"/derivatives/freesurfer/"$subject"/surf/"$hemisphere".sphere.reg.surf.gii "$dirHCP"/fs_LR-deformed_to-fsaverage."$hemi".sphere.32k_fs_LR.surf.gii \
-                        ADAP_BARY_AREA "$dataDir"/"$projectDir"/derivatives/freesurfer/"$subject"/surf/"$subject".fs_empirical_"$metric_new"_"$hemisphere".func.gii \
-                        -area-surfs "$dataDir"/"$projectDir"/derivatives/freesurfer/"$subject"/surf/"$hemisphere".midthickness.surf.gii "$dataDir"/"$projectDir"/derivatives/freesurfer/"$subject"/surf/"$subject"."$hemisphere".midthickness.32k_fs_LR.surf.gii      
+                wb_command -metric-resample "$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/"$data_folder"/"$subject"/"$hemisphere"."$metric".gii \
+                        "$surfDir"/"$hemisphere".sphere.reg.surf.gii "$dirHCP"/fs_LR-deformed_to-fsaverage."$hemi".sphere.32k_fs_LR.surf.gii \
+                        ADAP_BARY_AREA "$surfDir"/"$subject".fs_empirical_"$metric_new"_"$hemisphere".func.gii \
+                        -area-surfs "$surfDir"/"$hemisphere".midthickness.surf.gii "$surfDir"/"$subject"."$hemisphere".midthickness.32k_fs_LR.surf.gii
+                if [ $metric == "y" ]; then
+                    echo "Reconstructing polar angle and eccentricity from the resampled x/y maps..."
+                    reconstruct_coords_native.py \
+                        --x "$surfDir"/"$subject".fs_empirical_x0_"$hemisphere".func.gii \
+                        --y "$surfDir"/"$subject".fs_empirical_"$metric_new"_"$hemisphere".func.gii \
+                        --polarangle "$surfDir"/"$subject".fs_empirical_polarAngle_"$hemisphere".func.gii \
+                        --eccentricity "$surfDir"/"$subject".fs_empirical_eccentricity_"$hemisphere".func.gii
                     echo "Done!"
-               else
-                    wb_command -metric-resample "$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/"$data_folder"/"$subject"/"$hemisphere"."$metric".gii \
-                        "$dataDir"/"$projectDir"/derivatives/freesurfer/"$subject"/surf/"$hemisphere".sphere.reg.surf.gii "$dirHCP"/fs_LR-deformed_to-fsaverage."$hemi".sphere.32k_fs_LR.surf.gii \
-                        ADAP_BARY_AREA "$dataDir"/"$projectDir"/derivatives/freesurfer/"$subject"/surf/"$subject".fs_empirical_"$metric_new"_"$hemisphere".func.gii \
-                        -area-surfs "$dataDir"/"$projectDir"/derivatives/freesurfer/"$subject"/surf/"$hemisphere".midthickness.surf.gii "$dataDir"/"$projectDir"/derivatives/freesurfer/"$subject"/surf/"$subject"."$hemisphere".midthickness.32k_fs_LR.surf.gii      
                 fi
             done
         done

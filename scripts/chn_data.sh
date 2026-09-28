@@ -25,10 +25,10 @@ if [ -z "$dataDir" ] || [ -z "$dirHCP" ] || [ -z "$validationRepo" ] || [ -z "$o
     exit 1
 fi
 
-projectURL=https://github.com/OpenNeuroDatasets/ds003787.git
+
+projectURL=https://github.com/OpenNeuroDatasets/ds004698.git
 projectDir=${projectURL:37:-4} # after slash before .git
 cd $dataDir
-echo `pwd $dataDir`
 
 # git refuses to operate on a repository that appears to be owned by another user, which is the
 # case on network shares that squash ownership, and then every datalad call fails silently. Mark
@@ -49,7 +49,6 @@ echo "--------------------------------------------------------------------------
 echo "[Step 1] Data download..."
 echo "--------------------------------------------------------------------------------"
 cd "$dataDir"/"$projectDir"/derivatives/freesurfer
-echo `pwd .`
 for subject in `ls .`; 
 do
     if [ ${subject:0:3} != "sub" ]; then
@@ -62,34 +61,31 @@ do
             else
                 hemi="R"
             fi
-            echo $subject
             # freesurfer data
-            datalad get $subject/surf/"$hemisphere".pial
             datalad get $subject/surf/"$hemisphere".white
+            datalad get $subject/surf/"$hemisphere".pial
             datalad get $subject/surf/"$hemisphere".sphere
             datalad get $subject/surf/"$hemisphere".sphere.reg
             datalad get $subject/surf/"$hemisphere".thickness
             # prf estimates
-            datalad get "$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/$subject/ses-nyu3t01/*
-            # # functional data
-            # datalad get $dataDir/"$projectDir"/derivatives/fmriprep/$subject/ses-nyu3t01/func/*
-            # # stimulus apertures
-            # datalad get $dataDir/"$projectDir"/derivatives/stimulus_apertures/"$subject"/ses-nyu3t01/*.mat
+            datalad get "$dataDir"/"$projectDir"/derivatives/prf-estimation/"$subject"/prfs/"$subject"_ses-all_task-all_hemi-"$hemi"_space-fsnative_prf/*
+            datalad get "$dataDir"/"$projectDir"/derivatives/prf-estimation/"$subject"/prfs/"$subject"_ses-all_task-fixedbar_hemi-"$hemi"_space-fsnative_prf/*
+            datalad get "$dataDir"/"$projectDir"/derivatives/prf-estimation/"$subject"/prfs/"$subject"_ses-all_task-logbar_hemi-"$hemi"_space-fsnative_prf/*
         done
     fi
 done
-rm -rf sub-wlsubj121
 
-cd "$dataDir"/"$projectDir"/
-datalad unlock .
+# Download aperture data
+datalad get "$dataDir"/"$projectDir"/derivatives/prf-estimation/stimuli/*
 
 # Run deepRetinotopy
 echo "--------------------------------------------------------------------------------"
 echo "[Step 2] Run deepRetinotopy..."
 echo "--------------------------------------------------------------------------------"
-deepRetinotopy -s "$dataDir"/"$projectDir"/derivatives/freesurfer -t $dirHCP -d nyu -m "polarAngle,eccentricity,pRFsize" -j 64 -o "$outputDir"
+deepRetinotopy -s "$dataDir"/"$projectDir"/derivatives/freesurfer/ -t $dirHCP -d chn -m "polarAngle,eccentricity,pRFsize" -j 64 -o "$outputDir"
 
-# Convert the retinotopy data to .gii format in the fs_32k space
+
+# Data processing
 echo "--------------------------------------------------------------------------------"
 echo "[Step 3] Register data from native space to fs_average space..."
 echo "--------------------------------------------------------------------------------"
@@ -99,7 +95,6 @@ do
     if [ ${subject:0:3} != "sub" ]; then
         continue
     else
-        prfDir="$dataDir"/"$projectDir"/derivatives/prfanalyze-vista/"$subject"/ses-nyu3t01
         # Surfaces written by deepRetinotopy in Step 2 (same path as the -o passed above), so that the
         # empirical and predicted maps are resampled with the same template sphere and area surfaces
         surfDir="$outputDir"/"$subject"/surf
@@ -111,48 +106,43 @@ do
                 hemi="R"
             fi
 
-            # Polar angle and eccentricity are not resampled themselves: they are reconstructed from the
-            # resampled x/y maps below, so that the 0/360 wrap of the angle is never interpolated
-            for metric in sigma vexpl x y;
-            do
+            # Polar angle and eccentricity are reconstructed from the resampled x0/y0 maps below (metric y0),
+            # so that the 0/360 wrap of the angle is never interpolated
+            for metric in x0 y0 sigma vexpl;
+            do  
                 if [ $metric == "sigma" ]; then
                     metric_new="pRFsize"
                 elif [ $metric == "vexpl" ]; then
                     metric_new="variance_explained"
-                elif [ $metric == "x" ]; then
+                elif [ $metric == "x0" ]; then
                     metric_new="x0"
-                elif [ $metric == "y" ]; then
+                elif [ $metric == "y0" ]; then
                     metric_new="y0"
                 fi
 
-                echo "Converting $metric data to .gii format..."
-                mris_convert -c "$prfDir"/"$hemisphere"."$metric".mgz "$subject"/surf/"$hemisphere".white \
-                    "$prfDir"/"$hemisphere"."$metric".gii
-                input="$prfDir"/"$hemisphere"."$metric".gii
+                for experiment in fixedbar logbar all; do
+                    echo "Resampling native data to fsaverage space..."
+                    echo "Resampling $metric data..."
+                    
+                    echo "Convert $metric data to gii format..."
+                    mris_convert -c "$dataDir"/"$projectDir"/derivatives/prf-estimation/"$subject"/prfs/"$subject"_ses-all_task-"$experiment"_hemi-"$hemi"_space-fsnative_prf/"$subject"_ses-all_task-"$experiment"_hemi-"$hemi"_space-fsnative_$metric.mgz $subject/surf/"$hemisphere".white \
+                    "$dataDir"/"$projectDir"/derivatives/prf-estimation/"$subject"/prfs/"$subject"_ses-all_task-"$experiment"_hemi-"$hemi"_space-fsnative_prf/"$subject"_ses-all_task-"$experiment"_hemi-"$hemi"_space-fsnative_$metric.gii \
 
-                if [ $metric == "y" ]; then
-                    # In this dataset y points DOWN: angle.mgz equals atan2(-y, x) and the upper visual field
-                    # has negative y (unlike ds004440, where y points up). Flip it so that the reconstructed
-                    # polar angle has the upper vertical meridian at 90 degrees, as in every other dataset
-                    echo "Flipping the sign of y (y points down in the ds003787 pRF estimates)..."
-                    wb_command -metric-math "0 - v" "$prfDir"/"$hemisphere".y_up.gii -var v "$input"
-                    input="$prfDir"/"$hemisphere".y_up.gii
-                fi
-
-                echo "Resampling $metric data to the 32k_fs_LR space..."
-                wb_command -metric-resample "$input" \
-                    "$surfDir"/"$hemisphere".sphere.reg.surf.gii "$dirHCP"/fs_LR-deformed_to-fsaverage."$hemi".sphere.32k_fs_LR.surf.gii \
-                    ADAP_BARY_AREA "$surfDir"/"$subject".fs_empirical_"$metric_new"_"$hemisphere".func.gii \
-                    -area-surfs "$surfDir"/"$hemisphere".midthickness.surf.gii "$surfDir"/"$subject"."$hemisphere".midthickness.32k_fs_LR.surf.gii
-
-                if [ $metric == "y" ]; then
-                    echo "Reconstructing polar angle and eccentricity from the resampled x/y maps..."
-                    reconstruct_coords_native.py \
-                        --x "$surfDir"/"$subject".fs_empirical_x0_"$hemisphere".func.gii \
-                        --y "$surfDir"/"$subject".fs_empirical_y0_"$hemisphere".func.gii \
-                        --polarangle "$surfDir"/"$subject".fs_empirical_polarAngle_"$hemisphere".func.gii \
-                        --eccentricity "$surfDir"/"$subject".fs_empirical_eccentricity_"$hemisphere".func.gii
-                fi
+                    echo "Resampling $metric data..."
+                    wb_command -metric-resample "$dataDir"/"$projectDir"/derivatives/prf-estimation/"$subject"/prfs/"$subject"_ses-all_task-"$experiment"_hemi-"$hemi"_space-fsnative_prf/"$subject"_ses-all_task-"$experiment"_hemi-"$hemi"_space-fsnative_"$metric".gii \
+                            "$surfDir"/"$hemisphere".sphere.reg.surf.gii "$dirHCP"/fs_LR-deformed_to-fsaverage."$hemi".sphere.32k_fs_LR.surf.gii \
+                            ADAP_BARY_AREA "$surfDir"/"$subject".fs_empirical_"$metric_new"_"$experiment"_"$hemisphere".func.gii \
+                            -area-surfs "$surfDir"/"$hemisphere".midthickness.surf.gii "$surfDir"/"$subject"."$hemisphere".midthickness.32k_fs_LR.surf.gii   
+              
+                    if [ $metric == "y0" ]; then
+                        echo "Reconstructing polar angle and eccentricity from the resampled x0/y0 maps..."
+                        reconstruct_coords_native.py \
+                                --x "$surfDir"/"$subject".fs_empirical_x0_"$experiment"_"$hemisphere".func.gii \
+                                --y "$surfDir"/"$subject".fs_empirical_"$metric_new"_"$experiment"_"$hemisphere".func.gii \
+                                --polarangle "$surfDir"/"$subject".fs_empirical_polarAngle_"$experiment"_"$hemisphere".func.gii \
+                                --eccentricity "$surfDir"/"$subject".fs_empirical_eccentricity_"$experiment"_"$hemisphere".func.gii
+                    fi
+                done
             done
         done
     fi
