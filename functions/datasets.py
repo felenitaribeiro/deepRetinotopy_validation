@@ -273,7 +273,7 @@ class RetinotopyData_logbar(RetinotopyData):
         self.experiment = experiment
         # _load_map below only knows the legacy prediction filenames, so the left hemisphere
         # predictions are in the shifted convention and need normalising on read.
-        self.model = 'deepRetinotopy25'
+        self.model = 'deepRetinotopy25_visualCoord'
         self.split_half = None
 
         # Load maps during initialization
@@ -285,7 +285,12 @@ class RetinotopyData_logbar(RetinotopyData):
     def _load_map(self, map_type):
         """Override to load logbar data."""
         if map_type == 'predicted':
-            file_name = f"deepRetinotopy/{self.subject_id}.fs_predicted_{self.retinotopic_map}_{self.hemisphere}_curvatureFeat_model.func.gii"
+            if self.retinotopic_map not in VISUALCOORD_MODEL_TAGS:
+                raise ValueError(
+                    f"No visual coordinate model available for the map '{self.retinotopic_map}'.")
+            tag = VISUALCOORD_MODEL_TAGS[self.retinotopic_map]
+            tag = f"{tag}-model"
+            file_name = f"deepRetinotopy/{self.subject_id}.fs_predicted_{self.retinotopic_map}_{self.hemisphere}_curvatureFeat_{tag}.func.gii"
         elif map_type == 'empirical':
             file_name = f"surf/{self.subject_id}.fs_empirical_{self.retinotopic_map}_{self.experiment}_{self.hemisphere}.func.gii"
         elif map_type == 'variance_explained':

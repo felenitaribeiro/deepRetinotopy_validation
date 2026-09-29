@@ -232,7 +232,10 @@ def retinotopic_map_plot(subject_id, path, template_path, prediction = 'predicte
         data = data.predicted_map + threshold
     if binarize:
         data = discretize(data, retinotopic_map, hemisphere) + threshold
-    data[final_mask_L != 1] = 0
+    if hemisphere == 'lh':
+        data[final_mask_L != 1] = 0
+    else:
+        data[final_mask_R != 1] = 0
 
 
     # Plotting

@@ -144,7 +144,7 @@ def create_mask(final_mask_L_ROI, final_mask_R_ROI, final_mask_L, final_mask_R, 
     mask = ROI_masked + visualarea
     return ROI_masked, mask == 2
 
-def return_list_of_subs(dataset_name, pool_of_participants = 'all'):
+def return_list_of_subs(path, dataset_name, pool_of_participants = 'all'):
     """Return the list of subject IDs for the dataset.
 
     Args:
@@ -153,35 +153,30 @@ def return_list_of_subs(dataset_name, pool_of_participants = 'all'):
     Returns:
         list_of_subs (list): List of subject IDs
     """
-
+    import glob
     if dataset_name == 'hcp':
         list_of_subs = ['680957', '191841', '617748', '725751', '198653',
                          '191336', '572045', '601127', '644246', '157336']
     else:
-        if dataset_name == 'chn':
-            path = '//BULK/LABDATA/openneuro_deepRetinotopy/ds004698/derivatives/freesurfer/'
-            list_of_subs = os.listdir(path)
-        elif dataset_name == 'nyu':
-            path = '/BULK/LABDATA/openneuro_deepRetinotopy//ds003787/derivatives/freesurfer/'
-            list_of_subs = os.listdir(path)
-        elif dataset_name == 'nsd':
-            path = '/BULK/LABDATA/NSD/freesurfer/'
-            list_of_subs = os.listdir(path)
-        elif dataset_name == 'HCP':
-            path = '/home/ribeiro/Projects/deepRetinotopy_validation/HCP/freesurfer/'
-            list_of_subs = os.listdir(path)
-        elif dataset_name == 'stanford':
-            if pool_of_participants == 'all':
-                path = '/BULK/LABDATA/openneuro_deepRetinotopy/ds004440/derivatives/freesurfer/'
-            elif pool_of_participants == 'children':
-                path = '/BULK/LABDATA/openneuro_deepRetinotopy/ds004440/derivatives/prfanalyze-vista/children/'
+        if dataset_name == 'stanford':
+            if pool_of_participants == 'children':
+                path = path + '../ds004440/derivatives/prfanalyze-vista/children/'
             elif pool_of_participants == 'adults':
-                path = '/BULK/LABDATA/openneuro_deepRetinotopy/ds004440/derivatives/prfanalyze-vista/adults/'
+                path =  path + '../ds004440/derivatives/prfanalyze-vista/adults/'
+            else:
+                path = path
             list_of_subs = os.listdir(path)
-        elif dataset_name == 'kiwi':
-            path = '/BULK/LABDATA/sams_data/RetinotopyKiwi/'
+        else:
             list_of_subs = os.listdir(path)
-        
+            
+        for sub in glob.glob(os.path.join(path, '*.log')) + \
+                    glob.glob(os.path.join(path, '*.txt')) + \
+                    glob.glob(os.path.join(path, 'processed*')) + \
+                    glob.glob(os.path.join(path, '*.m')) + \
+                    glob.glob(os.path.join(path, 'logs')) + \
+                    glob.glob(os.path.join(path, 'fsaverage')):
+            sub_id = sub.split('/')[-1]
+            list_of_subs.remove(sub_id)
     return list_of_subs
 
 def apply_threshold(data, threshold):
@@ -467,7 +462,7 @@ def predicted_vs_empirical(path, dataset_name, retinotopic_maps, hemispheres,
         os.makedirs(output_dir + 'model_evaluation/' + dataset_name)
 
     # List of subjects
-    list_of_sub_ids = return_list_of_subs(dataset_name, pool_of_participants)
+    list_of_sub_ids = return_list_of_subs(path, dataset_name, pool_of_participants)
 
     correlation_scores_table = pd.DataFrame({'scores':[], 'hemisphere':[], 'retinotopic_map':[]})
     for retinotopic_map in retinotopic_maps:
@@ -709,7 +704,7 @@ def explainedvariance_vs_error_across_datasets(path, dataset_name, experiment, r
     mask = mask[ROI_masked == 1]
     mask = mask > 1
 
-    list_of_sub_ids = return_list_of_subs(dataset_name, 'all')
+    list_of_sub_ids = return_list_of_subs(path, dataset_name, 'all')
 
 
     errors_per_sub = []
