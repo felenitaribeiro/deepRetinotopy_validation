@@ -154,8 +154,11 @@ def transform_polarangle_to_benson14(path, path_to_save = None, deepretinotopy_d
     if hemisphere == 'lh':
         rotated_angle = np.abs(rotated_angle - 180)
     if hemisphere == 'rh':
-        rotated_angle = rotated_angle + 180
-        
+        # Negative for the right hemisphere: neuropythy's register_retinotopy negates RH angles by
+        # default (invert_rh_angle) to reach its 0-180 model, so positive RH input lands in the wrong
+        # hemifield and gets no valid position in the model
+        rotated_angle = -(rotated_angle + 180)
+
     # Step 3: Apply mask
     rotated_angle[mask] = 0
     data.agg_data()[:] = rotated_angle
